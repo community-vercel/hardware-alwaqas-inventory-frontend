@@ -80,17 +80,7 @@ const Login = () => {
     });
   };
 
-  // Demo login for testing - auto-fills credentials
-  const handleDemoLogin = (role) => {
-    const demoCredentials = {
-      superadmin: { email: 'superadmin@alwaqas.com', password: 'admin123' },
-      admin: { email: 'admin@alwaqas.com', password: 'admin123' },
-      staff: { email: 'staff@alwaqas.com', password: 'staff123' }
-    };
-    
-    setCredentials(demoCredentials[role]);
-    toast.info(`${role} credentials loaded. Click "Sign in" to login.`);
-  };
+ 
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -195,40 +185,10 @@ const Login = () => {
             </div>
           </form>
 
-          {/* Quick Login Buttons */}
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">Quick Test Credentials</span>
-              </div>
-            </div>
+         
 
-            <div className="mt-4 grid grid-cols-3 gap-2">
-              {[
-                { role: 'superadmin', label: 'Super Admin' },
-                { role: 'admin', label: 'Admin' },
-                { role: 'staff', label: 'Staff' }
-              ].map(({ role, label }) => (
-                <button
-                  key={role}
-                  type="button"
-                  onClick={() => handleDemoLogin(role)}
-                  className="py-2 px-3 text-sm font-medium text-white bg-gray-600 hover:bg-gray-700 rounded-md transition-colors"
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Debug Info (Optional - can remove in production) */}
         <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
           <div className="text-xs text-blue-700">
-            <p><strong>API Endpoint:</strong> http://localhost:5000/api/auth/login</p>
             <p><strong>Current Status:</strong> {loading ? 'Logging in...' : 'Ready'}</p>
           </div>
         </div>
@@ -239,6 +199,8 @@ const Login = () => {
         </div>
       </div>
     </div>
+    </div>
+
   );
 };
 
