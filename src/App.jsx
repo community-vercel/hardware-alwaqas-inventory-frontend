@@ -69,7 +69,8 @@ function App() {
               <Route path="pos" element={<POS />} />
               <Route path="expenses" element={<Expenses />} />
               <Route path="profile" element={<Profile />} />
-              
+              <Route path="*" element={<div>404 Page Not Found</div>} />
+
             </Route>
           </Routes>
         </div>
