@@ -29,6 +29,7 @@ const POS = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const searchInputRef = useRef(null);
+  const cartItemsRef = useRef(null);
 
   // Fetch products
   useEffect(() => {
@@ -118,6 +119,13 @@ const POS = () => {
     // Clear search
     setSearchTerm('');
     if (searchInputRef.current) searchInputRef.current.focus();
+    
+    // Scroll to bottom of cart items when new item is added
+    setTimeout(() => {
+      if (cartItemsRef.current) {
+        cartItemsRef.current.scrollTop = cartItemsRef.current.scrollHeight;
+      }
+    }, 100);
   };
 
   // Update quantity
@@ -169,77 +177,72 @@ const POS = () => {
 
   // Handle checkout
   const handleCheckout = async () => {
-  if (cart.length === 0) {
-    toast.error('Cart is empty');
-    return;
-  }
-
-  if (!paidAmount || parseFloat(paidAmount) === 0) {
-    toast.error('Please enter paid amount');
-    return;
-  }
-
-  if (parseFloat(paidAmount) < grandTotal) {
-    toast.error('Paid amount is less than total');
-    return;
-  }
-
-  setIsProcessing(true);
-
-  try {
-    const saleData = {
-      items: cart.map(item => ({
-        product: item.product,
-        productName: item.productName,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        discount: item.discount // This should be percentage (e.g., 10 for 10%)
-      })),
-      customer: customer.name || customer.phone ? customer : null,
-      paymentMethod,
-      paidAmount: parseFloat(paidAmount),
-      subtotal,
-      totalDiscount,
-      grandTotal,
-      change: change > 0 ? change : 0
-    };
-
-    console.log('Sending sale data:', saleData); // Debug log
-    
-    const response = await saleAPI.createSale(saleData);
-    
-    if (response.data.success) {
-      const sale = response.data.data;
-      toast.success('Sale completed successfully!');
-      
-      // Print receipt automatically
-      printReceipt(sale);
-      
-      // Reset form
-      resetPOS();
-    } else {
-      toast.error(response.data.message || 'Failed to complete sale');
+    if (cart.length === 0) {
+      toast.error('Cart is empty');
+      return;
     }
-    
-  } catch (error) {
-    console.error('Checkout error:', error);
-    
-    // Better error handling
-    if (error.response) {
-      // Server responded with error
-      toast.error(error.response.data.message || 'Failed to complete sale');
-      console.error('Error response:', error.response.data);
-    } else if (error.request) {
-      // Request made but no response
-      toast.error('No response from server. Please check your connection.');
-    } else {
-      // Other errors
-      toast.error('An unexpected error occurred');
+
+    if (!paidAmount || parseFloat(paidAmount) === 0) {
+      toast.error('Please enter paid amount');
+      return;
     }
-  } finally {
-    setIsProcessing(false);
-  }
-};
+
+    if (parseFloat(paidAmount) < grandTotal) {
+      toast.error('Paid amount is less than total');
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      const saleData = {
+        items: cart.map(item => ({
+          product: item.product,
+          productName: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          discount: item.discount
+        })),
+        customer: customer.name || customer.phone ? customer : null,
+        paymentMethod,
+        paidAmount: parseFloat(paidAmount),
+        subtotal,
+        totalDiscount,
+        grandTotal,
+        change: change > 0 ? change : 0
+      };
+
+      console.log('Sending sale data:', saleData);
+      
+      const response = await saleAPI.createSale(saleData);
+      
+      if (response.data.success) {
+        const sale = response.data.data;
+        toast.success('Sale completed successfully!');
+        
+        // Print receipt automatically
+        printReceipt(sale);
+        
+        // Reset form
+        resetPOS();
+      } else {
+        toast.error(response.data.message || 'Failed to complete sale');
+      }
+      
+    } catch (error) {
+      console.error('Checkout error:', error);
+      
+      if (error.response) {
+        toast.error(error.response.data.message || 'Failed to complete sale');
+      } else if (error.request) {
+        toast.error('No response from server. Please check your connection.');
+      } else {
+        toast.error('An unexpected error occurred');
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   // Reset POS
   const resetPOS = () => {
@@ -499,10 +502,10 @@ const POS = () => {
           </div>
         </div>
 
-        {/* Right Panel - Cart & Payment */}
-        <div className="w-1/3 flex flex-col bg-white">
-          {/* Cart Header */}
-          <div className="p-4 border-b border-gray-200">
+        {/* Right Panel - Cart & Payment - FIXED LAYOUT */}
+        <div className="w-1/3 flex flex-col bg-white shadow-lg">
+          {/* Fixed Cart Header */}
+          <div className="p-4 border-b border-gray-200 bg-white sticky top-0 z-10">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <ShoppingCartIcon className="h-6 w-6 text-indigo-600" />
@@ -514,7 +517,7 @@ const POS = () => {
               {cart.length > 0 && (
                 <button
                   onClick={() => setCart([])}
-                  className="text-sm text-red-600 hover:text-red-800"
+                  className="text-sm text-red-600 hover:text-red-800 px-3 py-1 hover:bg-red-50 rounded"
                 >
                   Clear All
                 </button>
@@ -522,23 +525,27 @@ const POS = () => {
             </div>
           </div>
 
-          {/* Cart Items */}
-          <div className="flex-1 overflow-y-auto p-4">
+          {/* Scrollable Cart Items */}
+          <div 
+            ref={cartItemsRef}
+            className="flex-1 overflow-y-auto"
+            style={{ maxHeight: 'calc(100vh - 500px)' }}
+          >
             {cart.length === 0 ? (
-              <div className="text-center py-12">
+              <div className="text-center py-12 px-4">
                 <ShoppingCartIcon className="mx-auto h-16 w-16 text-gray-300" />
                 <h3 className="mt-4 text-lg font-medium text-gray-900">Your cart is empty</h3>
                 <p className="mt-1 text-sm text-gray-500">Add products from the list</p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="p-4 space-y-3">
                 {cart.map((item) => (
-                  <div key={item.product} className="bg-gray-50 rounded-lg p-3">
+                  <div key={item.product} className="bg-gray-50 rounded-lg p-3 hover:bg-gray-100 transition-colors">
                     <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <h4 className="font-medium text-gray-900">{item.productName}</h4>
-                        <p className="text-sm text-gray-500">{item.sizePackage}</p>
-                        <p className="text-xs text-gray-400">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium text-gray-900 truncate">{item.productName}</h4>
+                        <p className="text-sm text-gray-500 truncate">{item.sizePackage}</p>
+                        <p className="text-xs text-gray-400 mt-1">
                           {formatCurrency(item.unitPrice)} each
                           {item.discount > 0 && (
                             <span className="ml-2 text-green-600">
@@ -548,32 +555,34 @@ const POS = () => {
                         </p>
                       </div>
                       
-                      <div className="flex items-center space-x-3">
-                        <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-3 ml-3">
+                        <div className="flex items-center space-x-2 bg-white rounded-lg border border-gray-200 p-1">
                           <button
                             onClick={() => updateQuantity(item.product, item.quantity - 1)}
-                            className="p-1 rounded-full hover:bg-gray-200"
+                            className="p-1 rounded-full hover:bg-gray-200 text-gray-600 hover:text-gray-900"
                           >
                             <MinusIcon className="h-4 w-4" />
                           </button>
-                          <span className="w-8 text-center font-bold text-lg">{item.quantity}</span>
+                          <span className="w-8 text-center font-bold text-lg text-gray-900">
+                            {item.quantity}
+                          </span>
                           <button
                             onClick={() => updateQuantity(item.product, item.quantity + 1)}
-                            className="p-1 rounded-full hover:bg-gray-200"
+                            className="p-1 rounded-full hover:bg-gray-200 text-gray-600 hover:text-gray-900"
                           >
                             <PlusIcon className="h-4 w-4" />
                           </button>
                         </div>
                         
                         <div className="text-right min-w-20">
-                          <div className="font-bold text-gray-900">
+                          <div className="font-bold text-gray-900 text-lg">
                             {formatCurrency(item.quantity * item.unitPrice * (1 - item.discount / 100))}
                           </div>
                         </div>
                         
                         <button
                           onClick={() => removeFromCart(item.product)}
-                          className="p-1 text-red-600 hover:text-red-800"
+                          className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-full"
                         >
                           <TrashIcon className="h-5 w-5" />
                         </button>
@@ -585,133 +594,174 @@ const POS = () => {
             )}
           </div>
 
-          {/* Customer Info */}
-          <div className="p-4 border-t border-gray-200">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">Customer Information</h3>
-            <div className="space-y-3">
-              <div className="relative">
-                <UserIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Customer Name (Optional)"
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg"
-                  value={customer.name}
-                  onChange={(e) => setCustomer({ ...customer, name: e.target.value })}
-                />
-              </div>
-              <div className="relative">
-                <PhoneIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
-                  type="tel"
-                  placeholder="Phone Number (Optional)"
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg"
-                  value={customer.phone}
-                  onChange={(e) => setCustomer({ ...customer, phone: e.target.value })}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Payment Section */}
-          <div className="p-4 border-t border-gray-200 bg-gray-50">
-            {/* Totals */}
-            <div className="space-y-2 mb-4">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Subtotal</span>
-                <span className="font-medium">{formatCurrency(subtotal)}</span>
-              </div>
-              {totalDiscount > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Discount</span>
-                  <span className="font-medium text-green-600">-{formatCurrency(totalDiscount)}</span>
+          {/* Fixed Payment Section - Always visible */}
+          <div className="border-t border-gray-200 bg-gray-50">
+            {/* Customer Info - Collapsible */}
+            {/* <div className="border-b border-gray-200">
+              <div className="p-4">
+                <div className="flex items-center justify-between mb-3 cursor-pointer" onClick={() => setShowCustomerInfo(!showCustomerInfo)}>
+                  <h3 className="text-sm font-medium text-gray-700">Customer Information</h3>
+                  <svg className={`h-5 w-5 text-gray-400 transform transition-transform ${showCustomerInfo ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
                 </div>
-              )}
-              <div className="flex justify-between pt-2 border-t border-gray-200">
-                <span className="text-lg font-bold">Total</span>
-                <span className="text-2xl font-bold text-indigo-600">
-                  {formatCurrency(grandTotal)}
-                </span>
+                {showCustomerInfo && (
+                  <div className="space-y-3 animate-fadeIn">
+                    <div className="relative">
+                      <UserIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Customer Name (Optional)"
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        value={customer.name}
+                        onChange={(e) => setCustomer({ ...customer, name: e.target.value })}
+                      />
+                    </div>
+                    <div className="relative">
+                      <PhoneIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <input
+                        type="tel"
+                        placeholder="Phone Number (Optional)"
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        value={customer.phone}
+                        onChange={(e) => setCustomer({ ...customer, phone: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
+            </div> */}
 
-            {/* Payment Method */}
-            <div className="mb-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Payment Method</h4>
-              <div className="grid grid-cols-4 gap-2">
-                {['cash', 'card', 'credit', 'mixed'].map((method) => (
-                  <button
-                    key={method}
-                    type="button"
-                    onClick={() => setPaymentMethod(method)}
-                    className={`py-2 px-3 rounded-lg text-sm font-medium flex flex-col items-center justify-center ${
-                      paymentMethod === method
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-                    }`}
-                  >
-                    {method === 'cash' && <BanknotesIcon className="h-5 w-5 mb-1" />}
-                    {method === 'card' && <CreditCardIcon className="h-5 w-5 mb-1" />}
-                    {method === 'credit' && <ReceiptPercentIcon className="h-5 w-5 mb-1" />}
-                    {method === 'mixed' && <CalculatorIcon className="h-5 w-5 mb-1" />}
-                    <span>{method.charAt(0).toUpperCase() + method.slice(1)}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Paid Amount */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Amount Paid
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">Rs</span>
-                <input
-                  type="number"
-                  className="w-full pl-12 pr-4 py-3 text-xl border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                  value={paidAmount}
-                  onChange={(e) => setPaidAmount(e.target.value)}
-                  placeholder="0"
-                  min="0"
-                  step="0.01"
-                />
-              </div>
-            </div>
-
-            {/* Change */}
-            {paidAmount && change >= 0 && (
-              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+            {/* Payment Section - Always visible */}
+            <div className="p-4 bg-white">
+              {/* Totals */}
+              <div className="space-y-3 mb-4">
                 <div className="flex justify-between items-center">
-                  <span className="font-medium text-gray-700">Change</span>
-                  <span className="text-xl font-bold text-green-600">
-                    {formatCurrency(change)}
+                  <span className="text-gray-600">Subtotal</span>
+                  <span className="font-medium text-lg">{formatCurrency(subtotal)}</span>
+                </div>
+                {totalDiscount > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Discount</span>
+                    <span className="font-medium text-lg text-green-600">-{formatCurrency(totalDiscount)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center pt-3 border-t border-gray-200">
+                  <span className="text-xl font-bold text-gray-900">Total</span>
+                  <span className="text-2xl font-bold text-indigo-600">
+                    {formatCurrency(grandTotal)}
                   </span>
                 </div>
               </div>
-            )}
 
-            {/* Checkout Button */}
-            <button
-              onClick={handleCheckout}
-              disabled={isProcessing || cart.length === 0 || !paidAmount || parseFloat(paidAmount) < grandTotal}
-              className={`w-full py-4 px-4 rounded-lg font-bold text-white text-lg ${
-                isProcessing || cart.length === 0 || !paidAmount || parseFloat(paidAmount) < grandTotal
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-green-600 hover:bg-green-700'
-              } transition-colors`}
-            >
-              {isProcessing ? (
-                <span className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-2"></div>
-                  Processing...
-                </span>
-              ) : (
-                <span className="flex items-center justify-center">
-                  <CreditCardIcon className="h-6 w-6 mr-2" />
-                  Complete Sale - {formatCurrency(grandTotal)}
-                </span>
+              {/* Payment Method */}
+              <div className="mb-4">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Payment Method</h4>
+                <div className="grid grid-cols-4 gap-2">
+                  {['cash', 'card', 'credit', 'mixed'].map((method) => (
+                    <button
+                      key={method}
+                      type="button"
+                      onClick={() => setPaymentMethod(method)}
+                      className={`py-2 px-3 rounded-lg text-sm font-medium flex flex-col items-center justify-center transition-all ${
+                        paymentMethod === method
+                          ? 'bg-indigo-600 text-white shadow-md'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
+                      }`}
+                    >
+                      {method === 'cash' && <BanknotesIcon className="h-5 w-5 mb-1" />}
+                      {method === 'card' && <CreditCardIcon className="h-5 w-5 mb-1" />}
+                      {method === 'credit' && <ReceiptPercentIcon className="h-5 w-5 mb-1" />}
+                      {method === 'mixed' && <CalculatorIcon className="h-5 w-5 mb-1" />}
+                      <span>{method.charAt(0).toUpperCase() + method.slice(1)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Paid Amount */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Amount Paid
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">Rs</span>
+                  <input
+                    type="number"
+                    className="w-full pl-12 pr-4 py-3 text-xl border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    value={paidAmount}
+                    onChange={(e) => setPaidAmount(e.target.value)}
+                    placeholder="0"
+                    min="0"
+                    step="0.01"
+                  />
+                  {/* Quick amount buttons */}
+                  <div className="flex space-x-2 mt-2">
+                    {[grandTotal, grandTotal * 1.1, grandTotal * 1.2, 1000, 5000].map((amount) => (
+                      <button
+                        key={amount}
+                        type="button"
+                        onClick={() => setPaidAmount(amount.toFixed(2))}
+                        className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                      >
+                        {formatCurrency(amount)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Change Display */}
+              {paidAmount && change >= 0 && (
+                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium text-gray-700">Change</span>
+                    <span className="text-xl font-bold text-green-600">
+                      {formatCurrency(change)}
+                    </span>
+                  </div>
+                </div>
               )}
-            </button>
+
+              {/* Complete Sale Button - Always visible at bottom */}
+              <button
+                onClick={handleCheckout}
+                disabled={isProcessing || cart.length === 0 || !paidAmount || parseFloat(paidAmount) < grandTotal}
+                className={`w-full py-4 px-4 rounded-xl font-bold text-white text-lg shadow-lg transition-all ${
+                  isProcessing || cart.length === 0 || !paidAmount || parseFloat(paidAmount) < grandTotal
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 hover:shadow-xl active:scale-[0.98]'
+                }`}
+              >
+                {isProcessing ? (
+                  <span className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-2"></div>
+                    Processing...
+                  </span>
+                ) : (
+                  <span className="flex items-center justify-center">
+                    <CreditCardIcon className="h-6 w-6 mr-2" />
+                    Complete Sale - {formatCurrency(grandTotal)}
+                  </span>
+                )}
+              </button>
+              
+              {/* Quick Actions */}
+              <div className="mt-4 flex justify-between">
+                <button
+                  onClick={resetPOS}
+                  className="px-4 py-2 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg"
+                >
+                  Cancel Sale
+                </button>
+                <button
+                  onClick={() => setPaidAmount(grandTotal.toFixed(2))}
+                  className="px-4 py-2 text-sm text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg"
+                >
+                  Exact Amount
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -753,4 +803,11 @@ const POS = () => {
   );
 };
 
-export default POS;
+// Add state for showCustomerInfo
+const POSWithCustomerInfo = () => {
+  const [showCustomerInfo, setShowCustomerInfo] = useState(false);
+  
+  return <POS showCustomerInfo={showCustomerInfo} setShowCustomerInfo={setShowCustomerInfo} />;
+};
+
+export default POSWithCustomerInfo;
