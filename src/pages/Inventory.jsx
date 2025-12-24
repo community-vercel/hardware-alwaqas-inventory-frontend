@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { 
   ExclamationTriangleIcon,
@@ -27,9 +27,23 @@ const Inventory = () => {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [quantityRange, setQuantityRange] = useState({ min: '', max: '' });
   const [valueRange, setValueRange] = useState({ min: '', max: '' });
+  const [allProductsForExport, setAllProductsForExport] = useState([]);
 
-  // Add refetchInterval to auto-refresh every 5 seconds
-  // This provides real-time updates without manual refresh
+  // Fetch ALL products for PDF export and low stock calculations
+  const { data: allProductsData } = useQuery({
+    queryKey: ['allProductsForExport'],
+    queryFn: () => productAPI.getProducts({ limit: 1000 }), // Get all products
+    staleTime: 30000,
+  });
+
+  // Update allProductsForExport when data loads
+  useEffect(() => {
+    if (allProductsData?.data?.docs) {
+      setAllProductsForExport(allProductsData.data.docs);
+    }
+  }, [allProductsData]);
+
+  // Fetch paginated products for table
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['inventory', { search, page }],
     queryFn: () => productAPI.getProducts({ 
@@ -38,14 +52,15 @@ const Inventory = () => {
       limit: 20 
     }),
     keepPreviousData: true,
-    refetchInterval: 5000, // Auto-refetch every 5 seconds
-    staleTime: 3000, // Data considered stale after 3 seconds
+    refetchInterval: 5000,
+    staleTime: 3000,
   });
 
+  // Fetch low stock products
   const { data: lowStockData } = useQuery({
     queryKey: ['lowStock'],
     queryFn: () => productAPI.getLowStock(),
-    refetchInterval: 5000, // Auto-refetch every 5 seconds
+    refetchInterval: 5000,
     staleTime: 3000,
   });
 
@@ -54,15 +69,31 @@ const Inventory = () => {
   const totalProducts = data?.totalDocs || 0;
   const lowStockProducts = lowStockData?.data || [];
 
-  // Enhanced filter logic combining both approaches
+  console.log('All products for export:', allProductsForExport.length);
+  console.log('Low stock products:', lowStockProducts);
+
+  // Get ALL low stock products from the full dataset for statistics
+  const getAllLowStockProducts = () => {
+    return allProductsForExport.filter(product => product.quantity <= product.minStockLevel);
+  };
+
+  const getAllOutOfStockProducts = () => {
+    return allProductsForExport.filter(product => product.quantity === 0);
+  };
+
+  const getAllCriticalStockProducts = () => {
+    return allProductsForExport.filter(product => product.quantity <= (product.minStockLevel || 10) / 2);
+  };
+
+  // Enhanced filter logic for table display
   const filteredProducts = products.filter(product => {
-    // Basic stock status filter (your original logic)
+    // Basic stock status filter
     if (filter === 'low') return product.quantity <= product.minStockLevel;
     if (filter === 'out') return product.quantity === 0;
     if (filter === 'good') return product.quantity > product.minStockLevel;
     if (filter === 'critical') return product.quantity <= (product.minStockLevel / 2);
     
-    // Additional filters from my enhancements
+    // Additional filters
     if (categoryFilter && product.category !== categoryFilter) return false;
     
     if (quantityRange.min !== '' && product.quantity < parseInt(quantityRange.min)) return false;
@@ -74,20 +105,20 @@ const Inventory = () => {
     
     return true;
   });
- 
-  // Enhanced statistics combining both approaches
+
+  // Statistics using FULL dataset
   const stats = {
-    totalProducts: products.length,
-    lowStock: lowStockProducts.length,
-    outOfStock: products.filter(p => p.quantity === 0).length,
-    criticalStock: products.filter(p => p.quantity <= (p.minStockLevel || 10) / 2).length,
-    totalValue: products.reduce((sum, p) => sum + (p.quantity * p.purchasePrice), 0),
-    averageStockValue: products.length > 0 
-      ? products.reduce((sum, p) => sum + (p.quantity * p.purchasePrice), 0) / products.length 
+    totalProducts: allProductsForExport.length,
+    lowStock: getAllLowStockProducts().length,
+    outOfStock: getAllOutOfStockProducts().length,
+    criticalStock: getAllCriticalStockProducts().length,
+    totalValue: allProductsForExport.reduce((sum, p) => sum + (p.quantity * p.purchasePrice), 0),
+    averageStockValue: allProductsForExport.length > 0 
+      ? allProductsForExport.reduce((sum, p) => sum + (p.quantity * p.purchasePrice), 0) / allProductsForExport.length 
       : 0,
-    totalInvestment: products.reduce((sum, p) => sum + (p.quantity * p.purchasePrice), 0),
-    potentialRevenue: products.reduce((sum, p) => sum + (p.quantity * p.salePrice), 0),
-    totalProfitPotential: products.reduce((sum, p) => {
+    totalInvestment: allProductsForExport.reduce((sum, p) => sum + (p.quantity * p.purchasePrice), 0),
+    potentialRevenue: allProductsForExport.reduce((sum, p) => sum + (p.quantity * p.salePrice), 0),
+    totalProfitPotential: allProductsForExport.reduce((sum, p) => {
       const cost = p.quantity * p.purchasePrice;
       const revenue = p.quantity * p.salePrice * (1 - (p.discount || 0) / 100);
       return sum + (revenue - cost);
@@ -97,58 +128,101 @@ const Inventory = () => {
   // Categories for filtering
   const categories = ['hardware', 'electrical', 'plumbing', 'tools', 'paint', 'other'];
 
-  // Export to PDF function
+  // Export to PDF function - uses ALL products for accurate reporting
   const exportToPDF = () => {
     try {
+      if (allProductsForExport.length === 0) {
+        toast.error('No products data available for PDF export');
+        return;
+      }
+
+      const loadingToast = toast.loading('Generating PDF report...');
+      
       // Dynamically import jsPDF
       import('jspdf').then(({ jsPDF }) => {
         import('jspdf-autotable').then((autoTable) => {
-          const doc = new jsPDF('landscape');
+          const doc = new jsPDF('landscape', 'mm', 'a4');
           
           // Header with logo and shop info
           doc.setFontSize(24);
-          doc.setTextColor(59, 130, 246); // Blue color
-          doc.text('AL-WAQAS HARDWARE & PAINT SHOP', 105, 15, { align: 'center' });
+          doc.setTextColor(59, 130, 246);
+          doc.text('AL-WAQAS HARDWARE & PAINT SHOP', doc.internal.pageSize.width / 2, 20, { align: 'center' });
           
           doc.setFontSize(16);
           doc.setTextColor(0, 0, 0);
-          doc.text('COMPLETE INVENTORY REPORT', 105, 25, { align: 'center' });
+          doc.text('COMPLETE INVENTORY REPORT', doc.internal.pageSize.width / 2, 30, { align: 'center' });
           
           // Date and time
           doc.setFontSize(10);
           const now = new Date();
-          doc.text(`Generated on: ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`, 105, 32, { align: 'center' });
+          doc.text(`Generated on: ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`, 
+            doc.internal.pageSize.width / 2, 40, { align: 'center' });
           
           // Summary section
           doc.setFontSize(12);
-          doc.text('INVENTORY SUMMARY', 14, 45);
+          doc.text('INVENTORY SUMMARY', 20, 55);
           
           // Summary box
           doc.setDrawColor(59, 130, 246);
           doc.setLineWidth(0.5);
-          doc.rect(13, 50, 275, 25);
+          doc.rect(20, 60, doc.internal.pageSize.width - 40, 20);
           
           // Summary content
           doc.setFontSize(10);
-          doc.text(`Total Products: ${stats.totalProducts}`, 15, 58);
-          doc.text(`Inventory Value: ${formatCurrency(stats.totalValue)}`, 15, 64);
-          doc.text(`Low Stock Items: ${stats.lowStock}`, 85, 58);
-          doc.text(`Out of Stock: ${stats.outOfStock}`, 85, 64);
-          doc.text(`Critical Stock: ${stats.criticalStock}`, 155, 58);
-          doc.text(`Profit Potential: ${formatCurrency(stats.totalProfitPotential)}`, 155, 64);
+          doc.text(`Total Products: ${stats.totalProducts}`, 25, 70);
+          doc.text(`Inventory Value: ${formatCurrency(stats.totalValue)}`, 25, 77);
+          doc.text(`Low Stock Items: ${stats.lowStock}`, 120, 70);
+          doc.text(`Out of Stock: ${stats.outOfStock}`, 120, 77);
+          doc.text(`Critical Stock: ${stats.criticalStock}`, 220, 70);
+          doc.text(`Profit Potential: ${formatCurrency(stats.totalProfitPotential)}`, 220, 77);
           
-          // Filter info
+          // Filter info if any filters are active
           if (filter !== 'all' || categoryFilter || search) {
-            doc.text('Filters Applied:', 220, 58);
+            doc.text('Filters Applied:', 320, 70);
             let filterText = [];
             if (filter !== 'all') filterText.push(`Stock: ${filter}`);
             if (categoryFilter) filterText.push(`Category: ${categoryFilter}`);
             if (search) filterText.push(`Search: "${search}"`);
-            doc.text(filterText.join(', '), 220, 64);
+            doc.text(filterText.join(', '), 320, 77);
           }
           
+          // Prepare data for PDF - Use filtered products for display, but include ALL in export if no filters
+          let productsForPDF = allProductsForExport;
+          
+          // If filters are applied, use filtered data
+          if (filter !== 'all' || categoryFilter || search || quantityRange.min || quantityRange.max || valueRange.min || valueRange.max) {
+            productsForPDF = allProductsForExport.filter(product => {
+              if (filter === 'low') return product.quantity <= product.minStockLevel;
+              if (filter === 'out') return product.quantity === 0;
+              if (filter === 'good') return product.quantity > product.minStockLevel;
+              if (filter === 'critical') return product.quantity <= (product.minStockLevel / 2);
+              
+              if (categoryFilter && product.category !== categoryFilter) return false;
+              
+              if (quantityRange.min !== '' && product.quantity < parseInt(quantityRange.min)) return false;
+              if (quantityRange.max !== '' && product.quantity > parseInt(quantityRange.max)) return false;
+              
+              const productValue = product.quantity * product.purchasePrice;
+              if (valueRange.min !== '' && productValue < parseInt(valueRange.min)) return false;
+              if (valueRange.max !== '' && productValue > parseInt(valueRange.max)) return false;
+              
+              if (search) {
+                const searchLower = search.toLowerCase();
+                return (
+                  product.productName?.toLowerCase().includes(searchLower) ||
+                  product.category?.toLowerCase().includes(searchLower) ||
+                  product.barcode?.toLowerCase().includes(searchLower)
+                );
+              }
+              
+              return true;
+            });
+          }
+          
+          console.log('Products for PDF:', productsForPDF.length);
+          
           // Table data
-          const tableData = filteredProducts.map(product => {
+          const tableData = productsForPDF.map(product => {
             const stockValue = product.quantity * product.purchasePrice;
             const stockStatus = getStockStatus(product.quantity, product.minStockLevel);
             
@@ -166,32 +240,42 @@ const Inventory = () => {
           
           // Create table
           autoTable.default(doc, {
-            startY: 80,
+            startY: 90,
             head: [
               ['Product Name', 'Size', 'Category', 'Stock', 'Cost', 'Price', 'Value', 'Status']
             ],
             body: tableData,
             theme: 'grid',
-            styles: { fontSize: 8, cellPadding: 2 },
+            styles: { 
+              fontSize: 8, 
+              cellPadding: 2,
+              overflow: 'linebreak'
+            },
             headStyles: { 
               fillColor: [59, 130, 246],
               textColor: [255, 255, 255],
-              fontStyle: 'bold'
+              fontStyle: 'bold',
+              halign: 'center'
             },
             columnStyles: {
-              3: { cellWidth: 25 }, // Stock column
-              4: { cellWidth: 25 }, // Cost column
-              5: { cellWidth: 25 }, // Price column
-              6: { cellWidth: 30 }, // Value column
-              7: { cellWidth: 20 }  // Status column
+              0: { cellWidth: 60 }, // Product Name
+              1: { cellWidth: 30 }, // Size
+              2: { cellWidth: 30 }, // Category
+              3: { cellWidth: 25 }, // Stock
+              4: { cellWidth: 25 }, // Cost
+              5: { cellWidth: 25 }, // Price
+              6: { cellWidth: 30 }, // Value
+              7: { cellWidth: 25 }  // Status
             },
+            margin: { left: 20, right: 20 },
             didDrawPage: function (data) {
               // Footer
               doc.setFontSize(8);
               doc.setTextColor(128, 128, 128);
+              const pageCount = doc.internal.getNumberOfPages();
               doc.text(
-                'Al-Waqas Hardware & Paint Shop • Inventory Management System • Page ' + doc.internal.getNumberOfPages(),
-                105,
+                `Al-Waqas Hardware & Paint Shop • Inventory Management System • Page ${data.pageNumber} of ${pageCount}`,
+                doc.internal.pageSize.width / 2,
                 doc.internal.pageSize.height - 10,
                 { align: 'center' }
               );
@@ -202,11 +286,18 @@ const Inventory = () => {
           const fileName = `alwaqas_inventory_${now.toISOString().split('T')[0]}_${Date.now()}.pdf`;
           doc.save(fileName);
           
-          toast.success('Inventory report exported to PDF successfully!');
+          toast.dismiss(loadingToast);
+          toast.success(`Inventory report exported successfully! (${productsForPDF.length} products)`);
+          
+        }).catch(error => {
+          console.error('PDF export error:', error);
+          toast.dismiss(loadingToast);
+          toast.error('Error loading PDF table generator. Please try again.');
         });
       }).catch(error => {
         console.error('PDF export error:', error);
-        toast.error('Error exporting PDF. Please try again.');
+        toast.dismiss(loadingToast);
+        toast.error('Error loading PDF library. Please refresh and try again.');
       });
     } catch (error) {
       console.error('PDF export error:', error);
@@ -214,9 +305,46 @@ const Inventory = () => {
     }
   };
 
-  // Export to CSV function
+  // Export to CSV function - also uses all products
   const exportToCSV = () => {
-    const exportData = filteredProducts.map(product => ({
+    let productsForCSV = allProductsForExport;
+    
+    // Apply filters if any
+    if (filter !== 'all' || categoryFilter || search || quantityRange.min || quantityRange.max || valueRange.min || valueRange.max) {
+      productsForCSV = allProductsForExport.filter(product => {
+        if (filter === 'low') return product.quantity <= product.minStockLevel;
+        if (filter === 'out') return product.quantity === 0;
+        if (filter === 'good') return product.quantity > product.minStockLevel;
+        if (filter === 'critical') return product.quantity <= (product.minStockLevel / 2);
+        
+        if (categoryFilter && product.category !== categoryFilter) return false;
+        
+        if (quantityRange.min !== '' && product.quantity < parseInt(quantityRange.min)) return false;
+        if (quantityRange.max !== '' && product.quantity > parseInt(quantityRange.max)) return false;
+        
+        const productValue = product.quantity * product.purchasePrice;
+        if (valueRange.min !== '' && productValue < parseInt(valueRange.min)) return false;
+        if (valueRange.max !== '' && productValue > parseInt(valueRange.max)) return false;
+        
+        if (search) {
+          const searchLower = search.toLowerCase();
+          return (
+            product.productName?.toLowerCase().includes(searchLower) ||
+            product.category?.toLowerCase().includes(searchLower) ||
+            product.barcode?.toLowerCase().includes(searchLower)
+          );
+        }
+        
+        return true;
+      });
+    }
+    
+    if (productsForCSV.length === 0) {
+      toast.error('No products to export');
+      return;
+    }
+
+    const exportData = productsForCSV.map(product => ({
       'Product Name': product.productName,
       'Size/Package': product.sizePackage,
       'Category': product.category,
@@ -252,7 +380,7 @@ const Inventory = () => {
     a.click();
     window.URL.revokeObjectURL(url);
     
-    toast.success(`Exported ${filteredProducts.length} products to CSV`);
+    toast.success(`Exported ${productsForCSV.length} products to CSV`);
   };
 
   // Reset all filters
@@ -287,6 +415,9 @@ const Inventory = () => {
           <h1 className="text-2xl font-bold text-gray-900">Inventory Management</h1>
           <p className="text-sm text-gray-500 mt-1">
             Last updated: {new Date().toLocaleDateString()} • Auto-refreshing every 5 seconds
+          </p>
+          <p className="text-xs text-gray-400 mt-1">
+            Showing {filteredProducts.length} of {stats.totalProducts} total products
           </p>
         </div>
         
@@ -425,11 +556,11 @@ const Inventory = () => {
                   >
                     <span>{label}</span>
                     <span className="text-xs font-medium">
-                      {key === 'all' && totalProducts}
-                      {key === 'good' && products.filter(p => p.quantity > p.minStockLevel).length}
-                      {key === 'low' && lowStockProducts.length}
-                      {key === 'critical' && products.filter(p => p.quantity <= (p.minStockLevel || 10) / 2).length}
-                      {key === 'out' && products.filter(p => p.quantity === 0).length}
+                      {key === 'all' && stats.totalProducts}
+                      {key === 'good' && allProductsForExport.filter(p => p.quantity > p.minStockLevel).length}
+                      {key === 'low' && stats.lowStock}
+                      {key === 'critical' && stats.criticalStock}
+                      {key === 'out' && stats.outOfStock}
                     </span>
                   </button>
                 ))}
@@ -462,7 +593,7 @@ const Inventory = () => {
                   >
                     {category}
                     <span className="float-right text-xs font-medium">
-                      ({products.filter(p => p.category === category).length})
+                      ({allProductsForExport.filter(p => p.category === category).length})
                     </span>
                   </button>
                 ))}
@@ -534,7 +665,7 @@ const Inventory = () => {
         </div>
       )}
 
-      {/* Search Bar - Keep your original layout */}
+      {/* Search Bar */}
       <div className="card">
         <div className="flex flex-col md:flex-row md:items-center justify-between space-y-4 md:space-y-0">
           <div className="flex-1 max-w-md">
@@ -570,7 +701,7 @@ const Inventory = () => {
         </div>
       </div>
 
-      {/* Low Stock Alert */}
+      {/* Low Stock Alert - Shows from lowStockData API */}
       {lowStockProducts.length > 0 && (
         <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
           <div className="flex items-center">
@@ -578,6 +709,7 @@ const Inventory = () => {
             <div className="ml-3">
               <p className="text-sm text-yellow-700">
                 <span className="font-medium">Alert:</span> You have {lowStockProducts.length} products with low stock.
+                {filter === 'low' && ` Showing ${filteredProducts.length} on current page.`}
               </p>
             </div>
           </div>
@@ -652,7 +784,8 @@ const Inventory = () => {
             <ExclamationTriangleIcon className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">No products found</h3>
             <p className="mt-1 text-sm text-gray-500">
-              {filter !== 'all' ? `No products match the "${filter}" filter.` : 'Try changing your search terms.'}
+              {filter !== 'all' ? `No products match the "${filter}" filter on this page.` : 'Try changing your search terms.'}
+              {filter === 'low' && ' Try going to page 1.'}
             </p>
           </div>
         )}
