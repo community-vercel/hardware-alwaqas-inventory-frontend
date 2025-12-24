@@ -221,7 +221,7 @@ const ProductForm = ({ product, onClose, onSuccess }) => {
                         <ErrorMessage name="salePrice" component="div" className="text-red-500 text-xs mt-1" />
                       </div>
                       
-                      <div>
+                      {/* <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Discount (%)
                         </label>
@@ -235,7 +235,7 @@ const ProductForm = ({ product, onClose, onSuccess }) => {
                           step="0.01"
                         />
                         <ErrorMessage name="discount" component="div" className="text-red-500 text-xs mt-1" />
-                      </div>
+                      </div> */}
                     </div>
                     
                     {/* Profit Calculation */}
