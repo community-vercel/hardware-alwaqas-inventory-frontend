@@ -836,7 +836,7 @@ const handleCheckout = async () => {
                 { key: 'cash', icon: BanknotesIcon, label: 'Cash' },
                 { key: 'card', icon: CreditCardIcon, label: 'Card' },
                 { key: 'credit', icon: ReceiptPercentIcon, label: 'Credit' },
-                { key: 'mixed', icon: '₹', label: 'Mixed' }
+                { key: 'mixed', icon: 'm', label: 'Mixed' }
               ].map((m) => (
                 <button
                   key={m.key}
