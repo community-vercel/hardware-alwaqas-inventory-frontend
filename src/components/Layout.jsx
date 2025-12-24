@@ -86,7 +86,12 @@ const Layout = () => {
       icon: ReceiptPercentIcon,
       roles: ['superadmin', 'admin']
     },
-   
+   { 
+      name: 'Customers', 
+      href: '/customers', 
+      icon: UserCircleIcon,
+      roles: ['superadmin', 'admin']
+    },
   ];
 
   const userNavigation = [
@@ -437,7 +442,7 @@ const Layout = () => {
         </header>
 
         {/* Main content area */}
-        <main className="flex-1 pb-8">
+        <main className="flex-1 pb-8 bg-white h-full">
           {/* Page header */}
           <div className="bg-white shadow">
             <div className="px-4 sm:px-6 lg:px-8">

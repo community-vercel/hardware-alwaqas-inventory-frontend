@@ -47,105 +47,102 @@ const Products = () => {
   const [importFile, setImportFile] = useState(null);
   const [importLoading, setImportLoading] = useState(false);
   const fileInputRef = useRef(null);
+  
   // Add this function to your component
-const downloadCSVTemplate = () => {
-  const templateData = [
-    {
-      'Product Name': 'Sample Product 1',
-      'Size/Package': '5 inch',
-      'Category': 'hardware',
-      'Unit': 'piece',
-      'Stock': 100,
-      'Purchase Price': 10.50,
-      'Sale Price': 15.99,
-      'Discount': 0,
-      'Minimum Stock': 20,
-      'Barcode': '1234567890',
-      'Stock Value': 1050.00
-    },
-    {
-      'Product Name': 'Sample Product 2',
-      'Size/Package': '1kg',
-      'Category': 'electrical',
-      'Unit': 'kg',
-      'Stock': 50,
-      'Purchase Price': 25.00,
-      'Sale Price': 35.50,
-      'Discount': 5,
-      'Minimum Stock': 10,
-      'Barcode': '0987654321',
-      'Stock Value': 1250.00
-    },
-    {
-      'Product Name': 'Sample Product 3',
-      'Size/Package': '500ml',
-      'Category': 'plumbing',
-      'Unit': 'liter',
-      'Stock': 75,
-      'Purchase Price': 8.00,
-      'Sale Price': 12.99,
-      'Discount': 10,
-      'Minimum Stock': 15,
-      'Barcode': '1122334455',
-      'Stock Value': 600.00
-    },
-    {
-      'Product Name': 'Sample Product 4',
-      'Size/Package': '10cm x 10cm',
-      'Category': 'hardware',
-      'Unit': 'piece',
-      'Stock': 30,
-      'Purchase Price': 5.25,
-      'Sale Price': 8.75,
-      'Discount': 0,
-      'Minimum Stock': 5,
-      'Barcode': '5566778899',
-      'Stock Value': 157.50
-    },
-    {
-      'Product Name': 'Sample Product 5',
-      'Size/Package': '2m',
-      'Category': 'electrical',
-      'Unit': 'meter',
-      'Stock': 45,
-      'Purchase Price': 15.75,
-      'Sale Price': 22.50,
-      'Discount': 15,
-      'Minimum Stock': 8,
-      'Barcode': '9988776655',
-      'Stock Value': 708.75
-    }
-  ];
+  const downloadCSVTemplate = () => {
+    const templateData = [
+      {
+        'Product Name': 'Sample Product 1',
+        'Size/Package': '5 inch',
+        'Category': 'hardware',
+        'Unit': 'piece',
+        'Stock': 100,
+        'Purchase Price': 10.50,
+        'Sale Price': 15.99,
+        'Minimum Stock': 20,
+        'Barcode': '1234567890',
+        'Stock Value': 1050.00
+      },
+      {
+        'Product Name': 'Sample Product 2',
+        'Size/Package': '1kg',
+        'Category': 'electrical',
+        'Unit': 'kg',
+        'Stock': 50,
+        'Purchase Price': 25.00,
+        'Sale Price': 35.50,
+        'Minimum Stock': 10,
+        'Barcode': '0987654321',
+        'Stock Value': 1250.00
+      },
+      {
+        'Product Name': 'Sample Product 3',
+        'Size/Package': '500ml',
+        'Category': 'plumbing',
+        'Unit': 'liter',
+        'Stock': 75,
+        'Purchase Price': 8.00,
+        'Sale Price': 12.99,
+        'Minimum Stock': 15,
+        'Barcode': '1122334455',
+        'Stock Value': 600.00
+      },
+      {
+        'Product Name': 'Sample Product 4',
+        'Size/Package': '10cm x 10cm',
+        'Category': 'hardware',
+        'Unit': 'piece',
+        'Stock': 30,
+        'Purchase Price': 5.25,
+        'Sale Price': 8.75,
+        'Minimum Stock': 5,
+        'Barcode': '5566778899',
+        'Stock Value': 157.50
+      },
+      {
+        'Product Name': 'Sample Product 5',
+        'Size/Package': '2m',
+        'Category': 'electrical',
+        'Unit': 'meter',
+        'Stock': 45,
+        'Purchase Price': 15.75,
+        'Sale Price': 22.50,
+        'Minimum Stock': 8,
+        'Barcode': '9988776655',
+        'Stock Value': 708.75
+      }
+    ];
 
-  // Create CSV content
-  const headers = Object.keys(templateData[0]);
-  const csvRows = [
-    headers.join(','),
-    ...templateData.map(row => headers.map(header => {
-      const cell = row[header];
-      // Escape commas and quotes in strings
-      if (typeof cell === 'string') {
-        // If string contains commas or quotes, wrap in quotes and escape existing quotes
-        if (cell.includes(',') || cell.includes('"')) {
-          return `"${cell.replace(/"/g, '""')}"`;
+    // Create CSV content
+    const headers = Object.keys(templateData[0]);
+    const csvRows = [
+      headers.join(','),
+      ...templateData.map(row => headers.map(header => {
+        const cell = row[header];
+        // Escape commas and quotes in strings
+        if (typeof cell === 'string') {
+          // If string contains commas or quotes, wrap in quotes and escape existing quotes
+          if (cell.includes(',') || cell.includes('"')) {
+            return `"${cell.replace(/"/g, '""')}"`;
+          }
+          return cell;
         }
         return cell;
-      }
-      return cell;
-    }).join(','))
-  ];
+      }).join(','))
+    ];
 
-  const csvContent = csvRows.join('\n');
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'products_template.csv';
-  a.click();
-  window.URL.revokeObjectURL(url);
-  
-  toast.success('CSV template downloaded successfully');
-};
+    const csvContent = csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'products_template.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+    
+    toast.success('CSV template downloaded successfully');
+  };
+
   const { data, isLoading, isError } = useQuery({
     queryKey: ['products', { search, category, page }],
     queryFn: () => productAPI.getProducts({ 
@@ -371,7 +368,6 @@ const downloadCSVTemplate = () => {
       'Stock': p.quantity,
       'Purchase Price': p.purchasePrice,
       'Sale Price': p.salePrice,
-      'Discount': p.discount || 0,
       'Minimum Stock': p.minStockLevel || 10,
       'Barcode': p.barcode || '',
       'Stock Value': (p.quantity || 0) * (p.purchasePrice || 0)
@@ -501,7 +497,6 @@ const downloadCSVTemplate = () => {
         'Stock': 100,
         'Purchase Price': 10.50,
         'Sale Price': 15.99,
-        'Discount': 0,
         'Minimum Stock': 20,
         'Barcode': '1234567890'
       },
@@ -513,7 +508,6 @@ const downloadCSVTemplate = () => {
         'Stock': 50,
         'Purchase Price': 25.00,
         'Sale Price': 35.50,
-        'Discount': 5,
         'Minimum Stock': 10,
         'Barcode': '0987654321'
       }
@@ -854,11 +848,6 @@ const downloadCSVTemplate = () => {
                         <div className="text-sm text-gray-500">
                           Cost: {formatCurrency(product.purchasePrice || 0)}
                         </div>
-                        {product.discount > 0 && (
-                          <div className="text-xs text-green-600">
-                            Discount: {product.discount}%
-                          </div>
-                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">
@@ -1150,12 +1139,6 @@ const downloadCSVTemplate = () => {
                           <span className="text-sm text-gray-600">Purchase Price:</span>
                           <span className="text-sm font-medium text-gray-900">{formatCurrency(viewingProduct.purchasePrice)}</span>
                         </div>
-                        {viewingProduct.discount > 0 && (
-                          <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Discount:</span>
-                            <span className="text-sm font-medium text-green-600">{viewingProduct.discount}%</span>
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -1351,12 +1334,12 @@ const downloadCSVTemplate = () => {
                       Required columns: <strong>Product Name, Size/Package, Unit, Category, Stock, Purchase Price, Sale Price</strong>
                     </p>
                     <button
-  onClick={downloadCSVTemplate}
-  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
->
-  <DocumentArrowDownIcon className="h-5 w-5 mr-2" />
-  Download CSV Template
-</button>
+                      onClick={downloadCSVTemplate}
+                      className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                    >
+                      <DocumentArrowDownIcon className="h-5 w-5 mr-2" />
+                      Download CSV Template
+                    </button>
                   </div>
                 </div>
               </div>

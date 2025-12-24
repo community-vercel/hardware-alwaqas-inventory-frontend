@@ -28,19 +28,25 @@ const Inventory = () => {
   const [quantityRange, setQuantityRange] = useState({ min: '', max: '' });
   const [valueRange, setValueRange] = useState({ min: '', max: '' });
 
-  const { data, isLoading } = useQuery({
+  // Add refetchInterval to auto-refresh every 5 seconds
+  // This provides real-time updates without manual refresh
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ['inventory', { search, page }],
     queryFn: () => productAPI.getProducts({ 
       search, 
       page, 
       limit: 20 
     }),
-    keepPreviousData: true
+    keepPreviousData: true,
+    refetchInterval: 5000, // Auto-refetch every 5 seconds
+    staleTime: 3000, // Data considered stale after 3 seconds
   });
 
   const { data: lowStockData } = useQuery({
     queryKey: ['lowStock'],
-    queryFn: () => productAPI.getLowStock()
+    queryFn: () => productAPI.getLowStock(),
+    refetchInterval: 5000, // Auto-refetch every 5 seconds
+    staleTime: 3000,
   });
 
   const products = data?.data?.docs || [];
@@ -259,6 +265,12 @@ const Inventory = () => {
     setShowAdvancedFilters(false);
   };
 
+  // Manual refresh button
+  const handleManualRefresh = () => {
+    refetch();
+    toast.success('Inventory refreshed!');
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-96">
@@ -274,11 +286,20 @@ const Inventory = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Inventory Management</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Last updated: {new Date().toLocaleDateString()}
+            Last updated: {new Date().toLocaleDateString()} • Auto-refreshing every 5 seconds
           </p>
         </div>
         
         <div className="flex flex-wrap gap-3">
+          <button
+            onClick={handleManualRefresh}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+            title="Manually refresh inventory data"
+          >
+            <ArrowPathIcon className="h-5 w-5 mr-2" />
+            Refresh
+          </button>
+
           <button
             onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
             className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"

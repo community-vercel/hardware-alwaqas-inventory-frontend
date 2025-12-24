@@ -83,6 +83,8 @@ export const saleAPI = {
   createSale: (data) => api.post('/sales', data),
   getDailySales: (params = {}) => api.get('/sales/daily', { params }),
   getSalesSummary: (params = {}) => api.get('/sales/summary', { params }),
+    getCustomersFromSales: (params = {}) => api.get('/sales/customers', { params }), // Add this
+
 };
 
 // Expense API
@@ -101,5 +103,6 @@ export const dashboardAPI = {
   getRecentSales: (limit = 10) => api.get('/dashboard/recent-sales', { params: { limit } }),
   getTopProducts: (limit = 10) => api.get('/dashboard/top-products', { params: { limit } }),
 };
+
 
 export default api;

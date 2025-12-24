@@ -13,6 +13,7 @@ import Inventory from './pages/Inventory';
 import Profile from './pages/Profile';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import Customers from './pages/Customer';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -69,6 +70,7 @@ function App() {
               <Route path="pos" element={<POS />} />
               <Route path="expenses" element={<Expenses />} />
               <Route path="profile" element={<Profile />} />
+              <Route path="customers" element={<Customers />} />
               <Route path="*" element={<div>404 Page Not Found</div>} />
 
             </Route>
