@@ -24,7 +24,7 @@ import { formatCurrency } from '../utils/helpers';
 import toast from 'react-hot-toast';
 
 const POS = () => {
-  const queryClient = useQueryClient(); // ← Add this
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState([]);
   const [customer, setCustomer] = useState({ name: '', phone: '' });
@@ -159,14 +159,19 @@ const POS = () => {
     setCart(prevCart => prevCart.filter(item => item.product !== productId));
   };
 
-  // Calculate item discount amount
+  // Calculate item discount amount with rounding
   const calculateItemDiscountAmount = (item) => {
     const itemTotal = item.quantity * item.unitPrice;
+    let discountAmount;
+    
     if (item.discountType === 'percentage') {
-      return (item.discountValue / 100) * itemTotal;
+      discountAmount = (item.discountValue / 100) * itemTotal;
     } else {
-      return item.discountValue;
+      discountAmount = item.discountValue;
     }
+    
+    // Round to 2 decimal places
+    return Math.round(discountAmount * 100) / 100;
   };
 
   // Apply global discount
@@ -226,7 +231,7 @@ const POS = () => {
     toast.success(`Applied discount to item`);
   };
 
-  // Calculate totals with proper discount handling
+  // Calculate totals with proper discount handling and rounding
   const calculateTotals = () => {
     let subtotal = 0;
     let itemDiscounts = 0;
@@ -250,14 +255,20 @@ const POS = () => {
     }
     
     const totalDiscount = itemDiscounts + globalDiscountAmount;
-    const grandTotal = Math.max(0, subtotal - totalDiscount);
+    
+    // Round to 2 decimal places to avoid floating point issues
+    const roundedSubtotal = Math.round(subtotal * 100) / 100;
+    const roundedItemDiscounts = Math.round(itemDiscounts * 100) / 100;
+    const roundedGlobalDiscountAmount = Math.round(globalDiscountAmount * 100) / 100;
+    const roundedTotalDiscount = Math.round(totalDiscount * 100) / 100;
+    const roundedGrandTotal = Math.max(0, Math.round((roundedSubtotal - roundedTotalDiscount) * 100) / 100);
     
     return { 
-      subtotal, 
-      itemDiscounts, 
-      globalDiscountAmount, 
-      totalDiscount, 
-      grandTotal
+      subtotal: roundedSubtotal, 
+      itemDiscounts: roundedItemDiscounts, 
+      globalDiscountAmount: roundedGlobalDiscountAmount, 
+      totalDiscount: roundedTotalDiscount, 
+      grandTotal: roundedGrandTotal
     };
   };
 
@@ -269,91 +280,97 @@ const POS = () => {
     grandTotal 
   } = calculateTotals();
   
-  const change = Math.max(0, parseFloat(paidAmount || 0) - grandTotal);
+  const change = Math.max(0, Math.round((parseFloat(paidAmount || 0) - grandTotal) * 100) / 100);
 
-  // Handle checkout with inventory sync
- // Handle checkout with real-time inventory update
-const handleCheckout = async () => {
-  if (cart.length === 0) {
-    toast.error('Cart is empty');
-    return;
-  }
-
-  if (!paidAmount || parseFloat(paidAmount) === 0) {
-    toast.error('Please enter paid amount');
-    return;
-  }
-
-  if (parseFloat(paidAmount) < grandTotal) {
-    toast.error('Paid amount is less than total');
-    return;
-  }
-
-  setIsProcessing(true);
-
-  try {
-    const saleData = {
-      items: cart.map(item => ({
-        product: item.product,
-        productName: item.productName,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        discount: item.discountValue,
-        discountType: item.discountType
-      })),
-      customer: customer.name || customer.phone ? customer : null,
-      paymentMethod,
-      paidAmount: parseFloat(paidAmount),
-      subtotal,
-      itemDiscounts,
-      globalDiscount: globalDiscount,
-      globalDiscountType,
-      globalDiscountAmount,
-      totalDiscount,
-      grandTotal,
-      change: change > 0 ? change : 0
-    };
-
-    const response = await saleAPI.createSale(saleData);
-    
-    if (response.data.success) {
-      const sale = response.data.data;
-      toast.success('Sale completed successfully!');
-      
-      // IMPORTANT: Update local products state with new quantities
-      const updatedProducts = products.map(product => {
-        const soldItem = cart.find(item => item.product === product._id);
-        if (soldItem) {
-          return {
-            ...product,
-            quantity: product.quantity - soldItem.quantity
-          };
-        }
-        return product;
-      });
-      
-      setProducts(updatedProducts);
-      
-      // Also invalidate queries to refresh other components
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      queryClient.invalidateQueries({ queryKey: ['lowStock'] });
-      queryClient.invalidateQueries({ queryKey: ['recentSales'] });
-      queryClient.invalidateQueries({ queryKey: ['dailySales'] });
-      
-      printReceipt(sale);
-      resetPOS();
-    } else {
-      toast.error(response.data.message || 'Failed to complete sale');
+  // Handle checkout with real-time inventory update
+  const handleCheckout = async () => {
+    if (cart.length === 0) {
+      toast.error('Cart is empty');
+      return;
     }
+
+    // Use rounded values for comparison
+    const paid = parseFloat(paidAmount) || 0;
+    const roundedPaid = Math.round(paid * 100) / 100;
+    const roundedGrandTotal = Math.round(grandTotal * 100) / 100;
     
-  } catch (error) {
-    console.error('Checkout error:', error);
-    toast.error(error.response?.data?.message || 'Failed to complete sale');
-  } finally {
-    setIsProcessing(false);
-  }
-};
+    if (roundedPaid === 0) {
+      toast.error('Please enter paid amount');
+      return;
+    }
+
+    if (roundedPaid < roundedGrandTotal) {
+      toast.error(`Paid amount (${formatCurrency(roundedPaid)}) is less than total (${formatCurrency(roundedGrandTotal)})`);
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      const roundedChange = Math.max(0, Math.round((roundedPaid - roundedGrandTotal) * 100) / 100);
+      
+      const saleData = {
+        items: cart.map(item => ({
+          product: item.product,
+          productName: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          discount: item.discountValue,
+          discountType: item.discountType
+        })),
+        customer: customer.name || customer.phone ? customer : null,
+        paymentMethod,
+        paidAmount: roundedPaid,
+        subtotal: Math.round(subtotal * 100) / 100,
+        itemDiscounts: Math.round(itemDiscounts * 100) / 100,
+        globalDiscount: Math.round(globalDiscount * 100) / 100,
+        globalDiscountType,
+        globalDiscountAmount: Math.round(globalDiscountAmount * 100) / 100,
+        totalDiscount: Math.round(totalDiscount * 100) / 100,
+        grandTotal: roundedGrandTotal,
+        change: roundedChange
+      };
+
+      const response = await saleAPI.createSale(saleData);
+      
+      if (response.data.success) {
+        const sale = response.data.data;
+        toast.success('Sale completed successfully!');
+        
+        // IMPORTANT: Update local products state with new quantities
+        const updatedProducts = products.map(product => {
+          const soldItem = cart.find(item => item.product === product._id);
+          if (soldItem) {
+            return {
+              ...product,
+              quantity: product.quantity - soldItem.quantity
+            };
+          }
+          return product;
+        });
+        
+        setProducts(updatedProducts);
+        
+        // Also invalidate queries to refresh other components
+        queryClient.invalidateQueries({ queryKey: ['products'] });
+        queryClient.invalidateQueries({ queryKey: ['inventory'] });
+        queryClient.invalidateQueries({ queryKey: ['lowStock'] });
+        queryClient.invalidateQueries({ queryKey: ['recentSales'] });
+        queryClient.invalidateQueries({ queryKey: ['dailySales'] });
+        
+        printReceipt(sale);
+        resetPOS();
+      } else {
+        toast.error(response.data.message || 'Failed to complete sale');
+      }
+      
+    } catch (error) {
+      console.error('Checkout error:', error);
+      toast.error(error.response?.data?.message || 'Failed to complete sale');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   // Reset POS
   const resetPOS = () => {
@@ -574,13 +591,13 @@ const handleCheckout = async () => {
           </div>
         </div>
 
-        {/* Right Panel - Cart & Payment (SCROLLABLE) */}
+        {/* Right Panel - Cart & Payment */}
         <div 
           ref={rightPanelRef}
-          className="w-96 bg-white shadow-lg flex flex-col rounded-xl border border-gray-200 overflow-hidden overflow-y-auto"
+          className="w-96 bg-white shadow-lg flex flex-col rounded-xl border border-gray-200 overflow-hidden"
         >
-          {/* Cart Header - Sticky */}
-          <div className="sticky top-0 z-30 p-4 border-b border-gray-200 bg-white">
+          {/* Cart Header */}
+          <div className="p-4 border-b border-gray-200 bg-white">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <div className="p-2 bg-blue-100 rounded-lg mr-2">
@@ -611,9 +628,9 @@ const handleCheckout = async () => {
             </div>
           </div>
 
-          {/* Global Discount Panel - Sticky */}
+          {/* Global Discount Panel */}
           {showGlobalDiscount && (
-            <div className="sticky top-20 z-20 p-4 bg-amber-50 border-b border-amber-200">
+            <div className="p-4 bg-amber-50 border-b border-amber-200">
               <div className="flex justify-between items-center mb-3">
                 <h4 className="font-semibold text-sm text-amber-900 flex items-center gap-2">
                   <SparklesIcon className="h-4 w-4" />
@@ -659,147 +676,149 @@ const handleCheckout = async () => {
             </div>
           )}
 
-          {/* Cart Items - Scrollable */}
-          <div className="flex-1 px-4 py-4 space-y-3">
-            {cart.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                <ShoppingCartIcon className="h-20 w-20 mb-4 opacity-20" />
-                <p className="text-base font-medium text-gray-600">Cart is empty</p>
-                <p className="text-xs mt-2 text-gray-500">Add products to begin</p>
-              </div>
-            ) : (
-              cart.map((item) => {
-                const itemTotal = item.quantity * item.unitPrice;
-                const discountAmount = calculateItemDiscountAmount(item);
-                const finalTotal = itemTotal - discountAmount;
+          {/* Scrollable Cart Items Container */}
+          <div className="flex-1 overflow-y-auto min-h-0" style={{ maxHeight: 'calc(100vh - 450px)' }}>
+            <div className="px-4 py-3 space-y-2">
+              {cart.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                  <ShoppingCartIcon className="h-20 w-20 mb-4 opacity-20" />
+                  <p className="text-base font-medium text-gray-600">Cart is empty</p>
+                  <p className="text-xs mt-2 text-gray-500">Add products to begin</p>
+                </div>
+              ) : (
+                cart.map((item) => {
+                  const itemTotal = item.quantity * item.unitPrice;
+                  const discountAmount = calculateItemDiscountAmount(item);
+                  const finalTotal = Math.round((itemTotal - discountAmount) * 100) / 100;
 
-                return (
-                  <div key={item.product} className="bg-gray-50 rounded-lg p-3.5 shadow-sm border border-gray-200 hover:border-blue-300 transition-all">
-                    <div className="flex justify-between items-start gap-3 mb-3">
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-gray-900 text-sm">{item.productName}</h4>
-                        <p className="text-xs text-gray-500">{item.sizePackage}</p>
-                      </div>
-                      <button
-                        onClick={() => removeFromCart(item.product)}
-                        className="p-1.5 hover:bg-red-100 rounded-lg text-red-600 transition-colors"
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-2 mb-3">
-                      <div className="flex items-center bg-white rounded-lg border border-gray-300 overflow-hidden">
-                        <button 
-                          onClick={() => updateQuantity(item.product, item.quantity - 1)}
-                          className="p-1.5 hover:bg-gray-100 text-gray-600 transition-colors"
+                  return (
+                    <div key={item.product} className="bg-gray-50 rounded-lg p-3 shadow-sm border border-gray-200 hover:border-blue-300 transition-all mb-2 last:mb-0">
+                      <div className="flex justify-between items-start gap-3 mb-2">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-gray-900 text-sm truncate">{item.productName}</h4>
+                          <p className="text-xs text-gray-500 mt-0.5">{item.sizePackage}</p>
+                        </div>
+                        <button
+                          onClick={() => removeFromCart(item.product)}
+                          className="p-1 hover:bg-red-100 rounded-lg text-red-600 transition-colors flex-shrink-0"
                         >
-                          <MinusIcon className="h-4 w-4" />
-                        </button>
-                        <span className="w-8 text-center text-gray-900 font-semibold text-sm">{item.quantity}</span>
-                        <button 
-                          onClick={() => updateQuantity(item.product, item.quantity + 1)}
-                          className="p-1.5 hover:bg-gray-100 text-gray-600 transition-colors"
-                        >
-                          <PlusIcon className="h-4 w-4" />
+                          <TrashIcon className="h-4 w-4" />
                         </button>
                       </div>
 
-                      <div className="text-right">
-                        <div className="font-bold text-blue-600 text-base">{formatCurrency(finalTotal)}</div>
-                        {discountAmount > 0 && (
-                          <div className="text-xs text-gray-500 line-through">{formatCurrency(itemTotal)}</div>
-                        )}
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className="flex items-center bg-white rounded-lg border border-gray-300 overflow-hidden">
+                          <button 
+                            onClick={() => updateQuantity(item.product, item.quantity - 1)}
+                            className="p-1.5 hover:bg-gray-100 text-gray-600 transition-colors"
+                          >
+                            <MinusIcon className="h-3.5 w-3.5" />
+                          </button>
+                          <span className="w-8 text-center text-gray-900 font-semibold text-sm">{item.quantity}</span>
+                          <button 
+                            onClick={() => updateQuantity(item.product, item.quantity + 1)}
+                            className="p-1.5 hover:bg-gray-100 text-gray-600 transition-colors"
+                          >
+                            <PlusIcon className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+
+                        <div className="text-right">
+                          <div className="font-bold text-blue-600 text-sm">{formatCurrency(finalTotal)}</div>
+                          {discountAmount > 0 && (
+                            <div className="text-xs text-gray-500 line-through">{formatCurrency(itemTotal)}</div>
+                          )}
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            setEditingItem(item.product);
+                            setItemDiscountInput(item.discountValue.toString());
+                            setItemDiscountType(item.discountType);
+                          }}
+                          className="p-1 hover:bg-blue-100 rounded-lg text-blue-600 transition-colors flex-shrink-0"
+                        >
+                          <PencilIcon className="h-4 w-4" />
+                        </button>
                       </div>
 
-                      <button
-                        onClick={() => {
-                          setEditingItem(item.product);
-                          setItemDiscountInput(item.discountValue.toString());
-                          setItemDiscountType(item.discountType);
-                        }}
-                        className="p-1.5 hover:bg-blue-100 rounded-lg text-blue-600 transition-colors"
-                      >
-                        <PencilIcon className="h-4 w-4" />
-                      </button>
+                      {item.discountValue > 0 && (
+                        <div className="text-xs text-green-700 bg-green-100 rounded px-2 py-1 inline-block mb-2">
+                          {item.discountType === 'percentage' 
+                            ? `-${item.discountValue}%` 
+                            : `-${formatCurrency(item.discountValue)}`
+                          } discount
+                        </div>
+                      )}
+
+                      {editingItem === item.product && (
+                        <div className="mt-2 pt-2 border-t border-gray-200">
+                          <div className="flex items-center gap-2 mb-2">
+                            <input
+                              type="number"
+                              value={itemDiscountInput}
+                              onChange={(e) => setItemDiscountInput(e.target.value)}
+                              className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-blue-500"
+                              placeholder="Amount"
+                              min="0"
+                            />
+                            <select
+                              value={itemDiscountType}
+                              onChange={(e) => setItemDiscountType(e.target.value)}
+                              className="px-2 py-1.5 border border-gray-300 rounded text-sm"
+                            >
+                              <option value="percentage">%</option>
+                              <option value="fixed">Fixed</option>
+                            </select>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => applyItemDiscount(item.product)}
+                              className="flex-1 px-2 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors"
+                            >
+                              Apply
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingItem(null);
+                                setItemDiscountInput('');
+                              }}
+                              className="flex-1 px-2 py-1.5 border border-gray-300 text-gray-700 hover:bg-gray-100 rounded text-xs transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-
-                    {item.discountValue > 0 && (
-                      <div className="text-xs text-green-700 bg-green-100 rounded px-2 py-1 inline-block mb-2">
-                        {item.discountType === 'percentage' 
-                          ? `-${item.discountValue}%` 
-                          : `-${formatCurrency(item.discountValue)}`
-                        } discount
-                      </div>
-                    )}
-
-                    {editingItem === item.product && (
-                      <div className="mt-3 pt-3 border-t border-gray-200">
-                        <div className="flex items-center gap-2 mb-2">
-                          <input
-                            type="number"
-                            value={itemDiscountInput}
-                            onChange={(e) => setItemDiscountInput(e.target.value)}
-                            className="flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
-                            placeholder="Amount"
-                            min="0"
-                          />
-                          <select
-                            value={itemDiscountType}
-                            onChange={(e) => setItemDiscountType(e.target.value)}
-                            className="px-3 py-1.5 border border-gray-300 rounded text-sm"
-                          >
-                            <option value="percentage">%</option>
-                            <option value="fixed">Fixed</option>
-                          </select>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => applyItemDiscount(item.product)}
-                            className="flex-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors"
-                          >
-                            Apply
-                          </button>
-                          <button
-                            onClick={() => {
-                              setEditingItem(null);
-                              setItemDiscountInput('');
-                            }}
-                            className="flex-1 px-3 py-1.5 border border-gray-300 text-gray-700 hover:bg-gray-100 rounded text-xs transition-colors"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
+                  );
+                })
+              )}
+            </div>
           </div>
 
-          {/* Fixed Bottom Payment Section - Sticky */}
-          <div className="sticky bottom-0 z-30 border-t border-gray-200 bg-white p-4 space-y-4 shadow-lg">
+          {/* Fixed Payment Section - Always visible and clickable */}
+          <div className="border-t border-gray-200 bg-white p-4 space-y-3">
             {/* Customer Info */}
             <button
               onClick={() => setShowCustomerInfo(!showCustomerInfo)}
-              className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-gray-700"
+              className="w-full flex items-center justify-between p-2.5 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-gray-700"
             >
               <div className="flex items-center gap-2 text-sm font-medium">
-                <UserIcon className="h-5 w-5 text-gray-500" />
+                <UserIcon className="h-4 w-4 text-gray-500" />
                 Customer Info
               </div>
-              {showCustomerInfo ? <ChevronUpIcon className="h-5 w-5" /> : <ChevronDownIcon className="h-5 w-5" />}
+              {showCustomerInfo ? <ChevronUpIcon className="h-4 w-4" /> : <ChevronDownIcon className="h-4 w-4" />}
             </button>
 
             {showCustomerInfo && (
-              <div className="space-y-2 pb-3 border-b border-gray-200">
+              <div className="space-y-2 pb-2 border-b border-gray-200">
                 <input
                   type="text"
                   placeholder="Name (optional)"
                   value={customer.name}
                   onChange={(e) => setCustomer({ ...customer, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-blue-500"
                 />
                 <input
                   type="tel"
@@ -807,13 +826,13 @@ const handleCheckout = async () => {
                   value={customer.phone}
                   onChange={(e) => setCustomer({ ...customer, phone: e.target.value.replace(/\D/g, '') })}
                   maxLength="11"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-blue-500"
                 />
               </div>
             )}
 
             {/* Totals */}
-            <div className="space-y-2 bg-gray-50 rounded-lg p-3 border border-gray-200">
+            <div className="space-y-1.5 bg-gray-50 rounded-lg p-3 border border-gray-200">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Subtotal</span>
                 <span className="font-semibold text-gray-900">{formatCurrency(subtotal)}</span>
@@ -824,7 +843,7 @@ const handleCheckout = async () => {
                   <span>-{formatCurrency(totalDiscount)}</span>
                 </div>
               )}
-              <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-300 text-blue-600">
+              <div className="flex justify-between text-base font-bold pt-1.5 border-t border-gray-300 text-blue-600">
                 <span>Total</span>
                 <span>{formatCurrency(grandTotal)}</span>
               </div>
@@ -841,16 +860,16 @@ const handleCheckout = async () => {
                 <button
                   key={m.key}
                   onClick={() => setPaymentMethod(m.key)}
-                  className={`p-2 rounded-lg text-xs font-medium flex flex-col items-center transition-all ${
+                  className={`p-1.5 rounded-lg text-xs font-medium flex flex-col items-center transition-all ${
                     paymentMethod === m.key 
                       ? 'bg-blue-600 text-white shadow-md' 
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
                   {typeof m.icon === 'string' ? (
-                    <span className="text-base mb-1">{m.icon}</span>
+                    <span className="text-xs mb-0.5">{m.icon}</span>
                   ) : (
-                    <m.icon className="h-4 w-4 mb-1" />
+                    <m.icon className="h-3.5 w-3.5 mb-0.5" />
                   )}
                   {m.label}
                 </button>
@@ -859,18 +878,18 @@ const handleCheckout = async () => {
 
             {/* Paid Amount */}
             <div>
-              <label className="text-xs font-semibold text-gray-700 block mb-2">Paid Amount</label>
+              <label className="text-xs font-semibold text-gray-700 block mb-1">Paid Amount</label>
               <input
                 type="number"
                 value={paidAmount}
                 onChange={(e) => setPaidAmount(e.target.value)}
                 placeholder="0.00"
-                className="w-full px-4 py-3 text-xl border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all font-semibold text-gray-900"
+                className="w-full px-3 py-2.5 text-lg border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-200 transition-all font-semibold text-gray-900"
               />
               <div className="flex gap-2 mt-2">
                 <button 
                   onClick={() => setPaidAmount(grandTotal.toFixed(2))}
-                  className="flex-1 py-2 border border-gray-300 rounded-lg text-xs text-gray-700 hover:bg-gray-100 transition-colors font-medium"
+                  className="flex-1 py-1.5 border border-gray-300 rounded-lg text-xs text-gray-700 hover:bg-gray-100 transition-colors font-medium"
                 >
                   Exact
                 </button>
@@ -878,7 +897,7 @@ const handleCheckout = async () => {
                   <button 
                     key={v}
                     onClick={() => setPaidAmount(v.toString())}
-                    className="flex-1 py-2 border border-gray-300 rounded-lg text-xs text-gray-700 hover:bg-gray-100 transition-colors font-medium"
+                    className="flex-1 py-1.5 border border-gray-300 rounded-lg text-xs text-gray-700 hover:bg-gray-100 transition-colors font-medium"
                   >
                     {v.toLocaleString()}
                   </button>
@@ -886,18 +905,18 @@ const handleCheckout = async () => {
               </div>
             </div>
 
-            {paidAmount && parseFloat(paidAmount) >= grandTotal && (
-              <div className="p-3 bg-green-50 rounded-lg text-center border border-green-200">
-                <div className="text-xs text-green-700 mb-1">Change</div>
-                <div className="text-2xl font-bold text-green-700">{formatCurrency(change)}</div>
+            {paidAmount && Math.round((parseFloat(paidAmount) || 0) * 100) / 100 >= grandTotal && (
+              <div className="p-2 bg-green-50 rounded-lg text-center border border-green-200">
+                <div className="text-xs text-green-700 mb-0.5">Change</div>
+                <div className="text-xl font-bold text-green-700">{formatCurrency(change)}</div>
               </div>
             )}
 
-            {/* Complete Button */}
+            {/* Complete Button - Always clickable */}
             <button
               onClick={handleCheckout}
-              disabled={isProcessing || cart.length === 0 || parseFloat(paidAmount || 0) < grandTotal}
-              className="w-full py-4 rounded-lg text-white font-bold text-base shadow-md disabled:bg-gray-400 disabled:cursor-not-allowed disabled:shadow-none bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 active:scale-95 transition-all duration-200 flex items-center justify-center gap-2"
+              disabled={isProcessing || cart.length === 0 || Math.round((parseFloat(paidAmount || 0) * 100) / 100) < Math.round(grandTotal * 100) / 100}
+              className="w-full py-3 rounded-lg text-white font-bold text-sm shadow-md disabled:bg-gray-400 disabled:cursor-not-allowed disabled:shadow-none bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2"
             >
               {isProcessing ? (
                 <>
@@ -906,7 +925,7 @@ const handleCheckout = async () => {
                 </>
               ) : (
                 <>
-                  <CheckIcon className="h-5 w-5" />
+                  <CheckIcon className="h-4 w-4" />
                   Complete Sale
                 </>
               )}
