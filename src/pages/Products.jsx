@@ -49,99 +49,104 @@ const Products = () => {
   const fileInputRef = useRef(null);
   
   // Add this function to your component
-  const downloadCSVTemplate = () => {
-    const templateData = [
-      {
-        'Product Name': 'Sample Product 1',
-        'Size/Package': '5 inch',
-        'Category': 'hardware',
-        'Unit': 'piece',
-        'Stock': 100,
-        'Purchase Price': 10.50,
-        'Sale Price': 15.99,
-        'Minimum Stock': 20,
-        'Barcode': '1234567890',
-        'Stock Value': 1050.00
-      },
-      {
-        'Product Name': 'Sample Product 2',
-        'Size/Package': '1kg',
-        'Category': 'electrical',
-        'Unit': 'kg',
-        'Stock': 50,
-        'Purchase Price': 25.00,
-        'Sale Price': 35.50,
-        'Minimum Stock': 10,
-        'Barcode': '0987654321',
-        'Stock Value': 1250.00
-      },
-      {
-        'Product Name': 'Sample Product 3',
-        'Size/Package': '500ml',
-        'Category': 'plumbing',
-        'Unit': 'liter',
-        'Stock': 75,
-        'Purchase Price': 8.00,
-        'Sale Price': 12.99,
-        'Minimum Stock': 15,
-        'Barcode': '1122334455',
-        'Stock Value': 600.00
-      },
-      {
-        'Product Name': 'Sample Product 4',
-        'Size/Package': '10cm x 10cm',
-        'Category': 'hardware',
-        'Unit': 'piece',
-        'Stock': 30,
-        'Purchase Price': 5.25,
-        'Sale Price': 8.75,
-        'Minimum Stock': 5,
-        'Barcode': '5566778899',
-        'Stock Value': 157.50
-      },
-      {
-        'Product Name': 'Sample Product 5',
-        'Size/Package': '2m',
-        'Category': 'electrical',
-        'Unit': 'meter',
-        'Stock': 45,
-        'Purchase Price': 15.75,
-        'Sale Price': 22.50,
-        'Minimum Stock': 8,
-        'Barcode': '9988776655',
-        'Stock Value': 708.75
-      }
-    ];
+const downloadCSVTemplate = () => {
+  const templateData = [
+    {
+      'Product Name': 'Sample Product 1',
+      'Size/Package': '5 inch',
+      'Category': 'hardware',
+      'Unit': 'piece',
+      'Stock': 100,
+      'Purchase Price': 10.50,
+      'Sale Price': 15.99,
+      'Minimum Stock': 20,
+      'Supplier': 'ABC Suppliers',  // Added Supplier column
+      'Barcode': '1234567890',
+      'Stock Value': 1050.00
+    },
+    {
+      'Product Name': 'Sample Product 2',
+      'Size/Package': '1kg',
+      'Category': 'electrical',
+      'Unit': 'kg',
+      'Stock': 50,
+      'Purchase Price': 25.00,
+      'Sale Price': 35.50,
+      'Minimum Stock': 10,
+      'Supplier': 'XYZ Traders',  // Added Supplier column
+      'Barcode': '0987654321',
+      'Stock Value': 1250.00
+    },
+    {
+      'Product Name': 'Sample Product 3',
+      'Size/Package': '500ml',
+      'Category': 'plumbing',
+      'Unit': 'liter',
+      'Stock': 75,
+      'Purchase Price': 8.00,
+      'Sale Price': 12.99,
+      'Minimum Stock': 15,
+      'Supplier': 'Global Suppliers',  // Added Supplier column
+      'Barcode': '1122334455',
+      'Stock Value': 600.00
+    },
+    {
+      'Product Name': 'Sample Product 4',
+      'Size/Package': '10cm x 10cm',
+      'Category': 'hardware',
+      'Unit': 'piece',
+      'Stock': 30,
+      'Purchase Price': 5.25,
+      'Sale Price': 8.75,
+      'Minimum Stock': 5,
+      'Supplier': 'Local Distributors',  // Added Supplier column
+      'Barcode': '5566778899',
+      'Stock Value': 157.50
+    },
+    {
+      'Product Name': 'Sample Product 5',
+      'Size/Package': '2m',
+      'Category': 'electrical',
+      'Unit': 'meter',
+      'Stock': 45,
+      'Purchase Price': 15.75,
+      'Sale Price': 22.50,
+      'Minimum Stock': 8,
+      'Supplier': 'Premium Imports',  // Added Supplier column
+      'Barcode': '9988776655',
+      'Stock Value': 708.75
+    }
+  ];
 
-    // Create CSV content
-    const headers = Object.keys(templateData[0]);
-    const csvRows = [
-      headers.join(','),
-      ...templateData.map(row => headers.map(header => {
-        const cell = row[header];
-        // Escape commas and quotes in strings
-        if (typeof cell === 'string') {
-          // If string contains commas or quotes, wrap in quotes and escape existing quotes
-          if (cell.includes(',') || cell.includes('"')) {
-            return `"${cell.replace(/"/g, '""')}"`;
-          }
-          return cell;
+  // Create CSV content
+  const headers = Object.keys(templateData[0]);
+  const csvRows = [
+    headers.join(','),
+    ...templateData.map(row => headers.map(header => {
+      const cell = row[header];
+      // Escape commas and quotes in strings
+      if (typeof cell === 'string') {
+        // If string contains commas or quotes, wrap in quotes and escape existing quotes
+        if (cell.includes(',') || cell.includes('"')) {
+          return `"${cell.replace(/"/g, '""')}"`;
         }
         return cell;
-      }).join(','))
-    ];
+      }
+      return cell;
+    }).join(','))
+  ];
 
-    const csvContent = csvRows.join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'products_template.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
-    
-    toast.success('CSV template downloaded successfully');
-  };
+  const csvContent = csvRows.join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'products_template_with_supplier.csv'; // Updated filename
+  a.click();
+  window.URL.revokeObjectURL(url);
+  
+  toast.success('CSV template with supplier column downloaded successfully');
+};
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['products', { search, category, page }],
@@ -1326,21 +1331,23 @@ const Products = () => {
                   </div>
 
                   {/* CSV Template */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-                    <h4 className="text-sm font-medium text-blue-800 mb-2">
-                      CSV Template Format
-                    </h4>
-                    <p className="text-xs text-blue-700 mb-2">
-                      Required columns: <strong>Product Name, Size/Package, Unit, Category, Stock, Purchase Price, Sale Price</strong>
-                    </p>
-                    <button
-                      onClick={downloadCSVTemplate}
-                      className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                    >
-                      <DocumentArrowDownIcon className="h-5 w-5 mr-2" />
-                      Download CSV Template
-                    </button>
-                  </div>
+                // In the CSV Template section of the import modal, update the text:
+<div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+  <h4 className="text-sm font-medium text-blue-800 mb-2">
+    CSV Template Format
+  </h4>
+  <p className="text-xs text-blue-700 mb-2">
+    Required columns: <strong>Product Name, Size/Package, Unit, Category, Stock, Purchase Price, Sale Price</strong><br />
+    Optional columns: <strong>Supplier, Minimum Stock, Barcode</strong>
+  </p>
+  <button
+    onClick={downloadCSVTemplate}
+    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+  >
+    <DocumentArrowDownIcon className="h-5 w-5 mr-2" />
+    Download CSV Template with Supplier
+  </button>
+</div>
                 </div>
               </div>
 

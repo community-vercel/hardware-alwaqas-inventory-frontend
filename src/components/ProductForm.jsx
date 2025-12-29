@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import { XMarkIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { Formik, Form, Field, ErrorMessage } from 'formik';
 import { productAPI } from '../services/api';
 import { productSchema } from '../utils/validators';
@@ -11,6 +11,72 @@ const ProductForm = ({ product, onClose, onSuccess }) => {
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showSupplierForm, setShowSupplierForm] = useState(false);
+  const [newSupplier, setNewSupplier] = useState('');
+  const [localSuppliers, setLocalSuppliers] = useState(() => {
+    // Load suppliers from localStorage on initial render
+    const saved = localStorage.getItem('productSuppliers');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // Fetch products to extract existing suppliers
+  const { data: productsData } = useQuery({
+    queryKey: ['products'],
+    queryFn: () => productAPI.getProducts({ limit: 1000 }),
+  });
+
+  // Extract unique suppliers from products
+  const extractSuppliersFromProducts = () => {
+    if (!productsData) return [];
+    
+    const products = productsData?.data?.docs || productsData?.docs || [];
+    const supplierSet = new Set();
+    
+    products.forEach(product => {
+      if (product.supplier && typeof product.supplier === 'string' && product.supplier.trim()) {
+        supplierSet.add(product.supplier.trim());
+      }
+    });
+    
+    return Array.from(supplierSet).sort();
+  };
+
+  // Combine extracted suppliers with local storage suppliers
+  const allSuppliers = [...new Set([...extractSuppliersFromProducts(), ...localSuppliers])].sort();
+
+  // Save suppliers to localStorage whenever localSuppliers changes
+  useEffect(() => {
+    localStorage.setItem('productSuppliers', JSON.stringify(localSuppliers));
+  }, [localSuppliers]);
+
+  // Add new supplier
+  const handleAddSupplier = () => {
+    if (!newSupplier.trim()) {
+      toast.error('Please enter a supplier name');
+      return;
+    }
+
+    // Check if supplier already exists
+    if (allSuppliers.includes(newSupplier.trim())) {
+      toast.error('Supplier already exists');
+      return;
+    }
+
+    setLocalSuppliers(prev => [...prev, newSupplier.trim()]);
+    setNewSupplier('');
+    setShowSupplierForm(false);
+    toast.success('Supplier added successfully');
+  };
+
+  // Delete supplier
+  const handleDeleteSupplier = (supplierName, event) => {
+    event.stopPropagation(); // Prevent form submission
+    
+    if (window.confirm(`Are you sure you want to delete supplier "${supplierName}"?`)) {
+      setLocalSuppliers(prev => prev.filter(s => s !== supplierName));
+      toast.success('Supplier deleted successfully');
+    }
+  };
 
   const mutation = useMutation({
     mutationFn: (values) => 
@@ -350,15 +416,105 @@ const ProductForm = ({ product, onClose, onSuccess }) => {
                           </div>
                           
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Supplier
-                            </label>
-                            <Field
-                              type="text"
-                              name="supplier"
-                              className="input-field"
-                              placeholder="Enter supplier name (optional)"
-                            />
+                            <div className="flex items-center justify-between mb-2">
+                              <label className="block text-sm font-medium text-gray-700">
+                                Supplier
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => setShowSupplierForm(true)}
+                                className="flex items-center text-xs text-indigo-600 hover:text-indigo-800"
+                              >
+                                <PlusIcon className="h-3 w-3 mr-1" />
+                                Add New
+                              </button>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              {/* Supplier Dropdown */}
+                              <div className="relative">
+                                <Field as="select" name="supplier" className="input-field pr-10">
+                                  <option value="">Select a supplier (optional)</option>
+                                  {allSuppliers.map((supplier) => (
+                                    <option key={supplier} value={supplier}>
+                                      {supplier}
+                                    </option>
+                                  ))}
+                                </Field>
+                                {values.supplier && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      setFieldValue('supplier', '');
+                                      handleDeleteSupplier(values.supplier, e);
+                                    }}
+                                    className="absolute right-2 top-1/2 transform -translate-y-1/2 text-red-500 hover:text-red-700"
+                                    title="Remove supplier"
+                                  >
+                                    <TrashIcon className="h-4 w-4" />
+                                  </button>
+                                )}
+                              </div>
+                              
+                              {/* Or enter custom supplier */}
+                              <div className="text-xs text-gray-500">
+                                Or type a new supplier name below:
+                              </div>
+                              <input
+                                type="text"
+                                value={values.supplier}
+                                onChange={(e) => setFieldValue('supplier', e.target.value)}
+                                className="input-field text-sm"
+                                placeholder="Type custom supplier name"
+                                list="supplier-suggestions"
+                              />
+                              <datalist id="supplier-suggestions">
+                                {allSuppliers.map((supplier) => (
+                                  <option key={supplier} value={supplier} />
+                                ))}
+                              </datalist>
+                            </div>
+                            
+                            {/* Add New Supplier Form */}
+                            {showSupplierForm && (
+                              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                                <div className="flex items-center justify-between mb-3">
+                                  <h5 className="text-sm font-medium text-blue-900">Add New Supplier</h5>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShowSupplierForm(false);
+                                      setNewSupplier('');
+                                    }}
+                                    className="text-blue-600 hover:text-blue-800"
+                                  >
+                                    <XMarkIcon className="h-4 w-4" />
+                                  </button>
+                                </div>
+                                <div className="flex space-x-2">
+                                  <input
+                                    type="text"
+                                    value={newSupplier}
+                                    onChange={(e) => setNewSupplier(e.target.value)}
+                                    className="flex-1 input-field text-sm"
+                                    placeholder="Enter supplier name"
+                                    onKeyPress={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleAddSupplier();
+                                      }
+                                    }}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={handleAddSupplier}
+                                    className="px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                                  >
+                                    Add
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                         
@@ -384,6 +540,11 @@ const ProductForm = ({ product, onClose, onSuccess }) => {
                   <div className="flex justify-between items-center">
                     <div className="text-sm text-gray-500">
                       {product ? 'Last updated: ' + new Date(product.updatedAt).toLocaleDateString() : ''}
+                      {allSuppliers.length > 0 && (
+                        <span className="ml-4">
+                          {allSuppliers.length} supplier{allSuppliers.length !== 1 ? 's' : ''} available
+                        </span>
+                      )}
                     </div>
                     <div className="flex space-x-3">
                       <button

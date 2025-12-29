@@ -92,6 +92,13 @@ const Layout = () => {
       icon: UserCircleIcon,
       roles: ['superadmin', 'admin']
     },
+
+     { 
+      name: 'Suppliers', 
+      href: '/suppliers', 
+      icon: UserCircleIcon,
+      roles: ['superadmin', 'admin']
+    },
   ];
 
   const userNavigation = [
