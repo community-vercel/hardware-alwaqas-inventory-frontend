@@ -42,7 +42,7 @@ const Profile = () => {
       const response = await fetch(API_STATUS_URL);
       const data = await response.json();
       
-      const nextCheckTime = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
+      const nextCheckTime = new Date(Date.now() + 24 * 60 * 60 * 1000);
       
       setApiStatus({
         loading: false,
@@ -52,7 +52,7 @@ const Profile = () => {
         nextCheck: nextCheckTime
       });
     } catch (error) {
-      const nextCheckTime = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
+      const nextCheckTime = new Date(Date.now() + 24 * 60 * 60 * 1000);
       
       setApiStatus({
         loading: false,
@@ -72,13 +72,13 @@ const Profile = () => {
     // Calculate time until next check (24 hours)
     const scheduleNextCheck = () => {
       const now = new Date();
-      const nextCheckTime = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
+      const nextCheckTime = new Date(now.getTime() + 24 * 60 * 60 * 1000);
       
       const timeUntilNextCheck = nextCheckTime.getTime() - now.getTime();
       
       const timeoutId = setTimeout(() => {
         checkApiStatus();
-        scheduleNextCheck(); // Schedule again for next 24 hours
+        scheduleNextCheck();
       }, timeUntilNextCheck);
       
       return timeoutId;

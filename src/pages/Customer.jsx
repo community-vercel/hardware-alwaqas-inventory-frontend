@@ -29,13 +29,7 @@ const Customers = () => {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
-    email: '',
-    address: {
-      street: '',
-      city: '',
-      postalCode: '',
-      country: ''
-    },
+    address: '',
     notes: '',
     subscribeToNotifications: false,
     customerType: 'regular'
@@ -54,7 +48,7 @@ const Customers = () => {
   });
 
   // DEBUG: Log the full response structure
-  console.log('Full API response:', data);
+  // console.log('Full API response:', data);
 
   // Extract data from response - FIXED
   const customers = data?.data?.data?.docs || []; // Changed this line
@@ -66,12 +60,12 @@ const Customers = () => {
   };
 
   // DEBUG: Log extracted data
-  console.log('Customers:', customers);
-  console.log('Stats:', stats);
+  // console.log('Customers:', customers);
+  // console.log('Stats:', stats);
 
   // Filter out customers with null/empty phone (these are from sales without customer info)
   const filteredCustomers = customers.filter(customer => 
-    customer.phone && customer.name
+    customer.phone && customer.name && customer.address
   );
 
   // Since customers from sales don't have email/address, 
@@ -122,7 +116,7 @@ const Customers = () => {
       name: customer.name || '',
       phone: customer.phone || '',
       email: '',
-      address: { street: '', city: '', postalCode: '', country: '' },
+      address: customer.address || '',
       notes: '',
       subscribeToNotifications: false,
       customerType: customer.totalSpent > 1000 ? 'vip' : 'regular'
@@ -139,7 +133,7 @@ const Customers = () => {
       name: '',
       phone: '',
       email: '',
-      address: { street: '', city: '', postalCode: '', country: '' },
+      address: customer.address || '',
       notes: '',
       subscribeToNotifications: false,
       customerType: 'regular'
@@ -280,6 +274,7 @@ const Customers = () => {
               <tr>
                 <th className="table-header">Customer</th>
                 <th className="table-header">Phone</th>
+                <th className="table-header">Address</th>
                 <th className="table-header">Type</th>
                 <th className="table-header">Purchases</th>
                 <th className="table-header">Total Spent</th>
@@ -304,6 +299,12 @@ const Customers = () => {
                       <div className="flex items-center text-sm text-gray-900">
                         <PhoneIcon className="h-4 w-4 mr-2 text-gray-400" />
                         {customer.phone || 'N/A'}
+                      </div>
+                    </td>
+                    <td className="table-cell">
+                      <div className="flex items-center text-sm text-gray-900">
+                        <PhoneIcon className="h-4 w-4 mr-2 text-gray-400" />
+                        {customer.address || 'N/A'}
                       </div>
                     </td>
                     <td className="table-cell">
