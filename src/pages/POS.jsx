@@ -1023,25 +1023,25 @@ const POS = () => {
                       )}
 
                       {editingItem === item.product && (
-                        <div className="mt-3 pt-3 border-t border-gray-200">
+                        <div className="mt-3 pt-3 border-t border-gray-200 ">
                           <div className="flex items-center justify-between mb-3">
-                            <button
+                            {/* <button
                               onClick={() => setShowDiscountCalculator(true)}
                               className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded"
                             >
                               <CalculatorIcon className="h-3 w-3" />
                               Calculator
-                            </button>
+                            </button> */}
                           </div>
                           
-                          <div className="flex items-center gap-2 mb-2">
+                          <div className="flex items-center gap-2 mb-2 pl-10 pr-10 text-sm">
                             <input
                               ref={discountInputRef}
                               type="number"
                               value={itemDiscountInput}
                               onChange={(e) => setItemDiscountInput(e.target.value)}
                               onKeyDown={(e) => handleDiscountKeyPress(e, item.product)}
-                              className="flex-1 px-3 py-2 border border-blue-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              className="flex-1 px-1 py-1 border border-blue-300 rounded-sm text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                               placeholder="Discount amount"
                               min="0"
                               step="0.5"
@@ -1049,7 +1049,7 @@ const POS = () => {
                             <select
                               value={itemDiscountType}
                               onChange={(e) => setItemDiscountType(e.target.value)}
-                              className="px-3 py-2 border border-blue-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              className="px-1 py-1 border border-blue-300 rounded-sm text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             >
                               <option value="percentage">%</option>
                               <option value="fixed">Fixed</option>
@@ -1058,13 +1058,13 @@ const POS = () => {
                           
                           {/* Discount Preview */}
                           {itemDiscountInput && parseFloat(itemDiscountInput) > 0 && (
-                            <div className="mb-2 p-2 bg-blue-50 rounded border border-blue-200">
-                              <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="mb-1 p-1 bg-blue-50 rounded border border-blue-200 ">
+                              <div className="grid grid-cols-2 gap-1 text-xs">
                                 <div className="text-gray-600">Original:</div>
                                 <div className="text-right font-medium">{formatCurrency(itemTotal)}</div>
                                 
                                 <div className="text-gray-600">Discount:</div>
-                                <div className="text-right font-medium text-green-700">
+                                <div className="text-right font-sm text-green-700">
                                   {itemDiscountType === 'percentage' 
                                     ? `${itemDiscountInput}%` 
                                     : formatCurrency(parseFloat(itemDiscountInput))
