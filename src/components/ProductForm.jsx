@@ -109,6 +109,10 @@ const ProductForm = ({ product, onClose, onSuccess }) => {
     category: product?.category || 'hardware',
     barcode: product?.barcode || '',
     supplier: product?.supplier || '',
+    supplierSalesPerson: product?.supplierSalesPerson || '',
+    supplierContact: product?.supplierContact || '',
+    supplierEmail: product?.supplierEmail || '',
+    supplierAddress: product?.supplierAddress || '',
     isActive: product?.isActive !== undefined ? product.isActive : true
   };
 
@@ -517,6 +521,66 @@ const ProductForm = ({ product, onClose, onSuccess }) => {
                             )}
                           </div>
                         </div>
+
+                        {/* Supplier Contact Information - NEW SECTION */}
+                        {values.supplier && (
+                          <div className="border-t pt-4 mt-4">
+                            <h5 className="text-sm font-medium text-gray-700 mb-3">Supplier Contact Information</h5>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Sales Person
+                                </label>
+                                <Field
+                                  type="text"
+                                  name="supplierSalesPerson"
+                                  className="input-field text-sm"
+                                  placeholder="Sales person name"
+                                />
+                              </div>
+                              
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Contact Number
+                                </label>
+                                <Field
+                                  type="text"
+                                  name="supplierContact"
+                                  className="input-field text-sm"
+                                  placeholder="Phone number"
+                                />
+                              </div>
+                              
+                              <div className="md:col-span-2">
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Email Address
+                                </label>
+                                <Field
+                                  type="email"
+                                  name="supplierEmail"
+                                  className="input-field text-sm"
+                                  placeholder="email@example.com"
+                                />
+                              </div>
+                              
+                              <div className="md:col-span-2">
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  Address
+                                </label>
+                                <Field
+                                  as="textarea"
+                                  name="supplierAddress"
+                                  className="input-field text-sm min-h-[80px]"
+                                  placeholder="Full address"
+                                  rows="3"
+                                />
+                              </div>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-2">
+                              Supplier contact information will be saved with this product
+                            </p>
+                          </div>
+                        )}
                         
                         <div>
                           <label className="flex items-center">

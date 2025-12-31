@@ -181,7 +181,7 @@ const Customers = () => {
           </p>
         </div>
         
-        <button
+        {/* <button
           onClick={() => {
             toast.info('Add customers by creating a new sale');
           }}
@@ -189,7 +189,7 @@ const Customers = () => {
         >
           <PlusIcon className="h-5 w-5 mr-2" />
           Create Sale to Add Customer
-        </button>
+        </button> */}
       </div>
 
       {/* Stats Cards */}

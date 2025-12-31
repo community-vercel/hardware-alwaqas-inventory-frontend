@@ -21,7 +21,12 @@ import {
   DocumentTextIcon,
   PrinterIcon,
   ArrowDownTrayIcon,
-  CloudArrowUpIcon
+  CloudArrowUpIcon,
+  UserIcon,
+  PhoneIcon,
+  EnvelopeIcon,
+  MapPinIcon,
+  BuildingOfficeIcon
 } from '@heroicons/react/24/outline';
 import { productAPI } from '../services/api';
 import { formatCurrency, getStockStatus, formatDate } from '../utils/helpers';
@@ -60,7 +65,11 @@ const downloadCSVTemplate = () => {
       'Purchase Price': 10.50,
       'Sale Price': 15.99,
       'Minimum Stock': 20,
-      'Supplier': 'ABC Suppliers',  // Added Supplier column
+      'Supplier': 'ABC Suppliers',
+      'Supplier Sales Person': 'John Doe',
+      'Supplier Contact': '+1234567890',
+      'Supplier Email': 'john@abcsuppliers.com',
+      'Supplier Address': '123 Main St, City, Country',
       'Barcode': '1234567890',
       'Stock Value': 1050.00
     },
@@ -73,7 +82,11 @@ const downloadCSVTemplate = () => {
       'Purchase Price': 25.00,
       'Sale Price': 35.50,
       'Minimum Stock': 10,
-      'Supplier': 'XYZ Traders',  // Added Supplier column
+      'Supplier': 'XYZ Traders',
+      'Supplier Sales Person': 'Jane Smith',
+      'Supplier Contact': '+0987654321',
+      'Supplier Email': 'jane@xyztraders.com',
+      'Supplier Address': '456 Market St, City, Country',
       'Barcode': '0987654321',
       'Stock Value': 1250.00
     },
@@ -86,35 +99,13 @@ const downloadCSVTemplate = () => {
       'Purchase Price': 8.00,
       'Sale Price': 12.99,
       'Minimum Stock': 15,
-      'Supplier': 'Global Suppliers',  // Added Supplier column
+      'Supplier': 'Global Suppliers',
+      'Supplier Sales Person': 'Robert Johnson',
+      'Supplier Contact': '+1122334455',
+      'Supplier Email': 'robert@globalsuppliers.com',
+      'Supplier Address': '789 Industrial Ave, City, Country',
       'Barcode': '1122334455',
       'Stock Value': 600.00
-    },
-    {
-      'Product Name': 'Sample Product 4',
-      'Size/Package': '10cm x 10cm',
-      'Category': 'hardware',
-      'Unit': 'piece',
-      'Stock': 30,
-      'Purchase Price': 5.25,
-      'Sale Price': 8.75,
-      'Minimum Stock': 5,
-      'Supplier': 'Local Distributors',  // Added Supplier column
-      'Barcode': '5566778899',
-      'Stock Value': 157.50
-    },
-    {
-      'Product Name': 'Sample Product 5',
-      'Size/Package': '2m',
-      'Category': 'electrical',
-      'Unit': 'meter',
-      'Stock': 45,
-      'Purchase Price': 15.75,
-      'Sale Price': 22.50,
-      'Minimum Stock': 8,
-      'Supplier': 'Premium Imports',  // Added Supplier column
-      'Barcode': '9988776655',
-      'Stock Value': 708.75
     }
   ];
 
@@ -145,7 +136,7 @@ const downloadCSVTemplate = () => {
   a.click();
   window.URL.revokeObjectURL(url);
   
-  toast.success('CSV template with supplier column downloaded successfully');
+  toast.success('CSV template with supplier columns downloaded successfully');
 };
 
   const { data, isLoading, isError } = useQuery({
@@ -320,21 +311,22 @@ const downloadCSVTemplate = () => {
           doc.text(`Total Products: ${totalDocs}`, 20, 40);
           doc.text(`Total Value: ${formatCurrency(products.reduce((sum, p) => sum + ((p.quantity || 0) * (p.purchasePrice || 0)), 0))}`, 20, 48);
           
-          // Table data
+          // Table data - Include supplier in PDF export
           const tableData = products.map(product => [
             product.productName || 'N/A',
             product.sizePackage || 'N/A',
             product.category || 'Uncategorized',
+            product.supplier || 'N/A', // Added supplier to PDF
             `${product.quantity || 0} ${product.unit || 'piece'}`,
             formatCurrency(product.purchasePrice || 0),
             formatCurrency(product.salePrice || 0),
-            formatCurrency((product.quantity || 0) * (product.purchasePrice || 0))
+            formatCurrency((product.quantity || 0) * (purchasePrice || 0))
           ]);
           
           // Create table
           autoTable.default(doc, {
             startY: 55,
-            head: [['Product Name', 'Size', 'Category', 'Stock', 'Cost', 'Price', 'Value']],
+            head: [['Product Name', 'Size', 'Category', 'Supplier', 'Stock', 'Cost', 'Price', 'Value']],
             body: tableData,
             theme: 'grid',
             styles: { fontSize: 8 },
@@ -374,6 +366,11 @@ const downloadCSVTemplate = () => {
       'Purchase Price': p.purchasePrice,
       'Sale Price': p.salePrice,
       'Minimum Stock': p.minStockLevel || 10,
+      'Supplier': p.supplier || '',
+      'Supplier Sales Person': p.supplierSalesPerson || '',
+      'Supplier Contact': p.supplierContact || '',
+      'Supplier Email': p.supplierEmail || '',
+      'Supplier Address': p.supplierAddress || '',
       'Barcode': p.barcode || '',
       'Stock Value': (p.quantity || 0) * (p.purchasePrice || 0)
     }));
@@ -432,6 +429,7 @@ const downloadCSVTemplate = () => {
                 <th>Product Name</th>
                 <th>Size</th>
                 <th>Category</th>
+                <th>Supplier</th>
                 <th>Stock</th>
                 <th>Cost</th>
                 <th>Price</th>
@@ -444,6 +442,7 @@ const downloadCSVTemplate = () => {
                   <td>${product.productName || 'N/A'}</td>
                   <td>${product.sizePackage || 'N/A'}</td>
                   <td>${product.category || 'Uncategorized'}</td>
+                  <td>${product.supplier || 'N/A'}</td>
                   <td>${product.quantity || 0} ${product.unit || 'piece'}</td>
                   <td>${formatCurrency(product.purchasePrice || 0)}</td>
                   <td>${formatCurrency(product.salePrice || 0)}</td>
@@ -489,51 +488,6 @@ const downloadCSVTemplate = () => {
       default:
         toast.info(`Action "${action}" not implemented yet`);
     }
-  };
-
-  // Create sample CSV template
-  const downloadSampleTemplate = () => {
-    const sampleData = [
-      {
-        'Product Name': 'Sample Product 1',
-        'Size/Package': '5 inch',
-        'Unit': 'piece',
-        'Category': 'hardware',
-        'Stock': 100,
-        'Purchase Price': 10.50,
-        'Sale Price': 15.99,
-        'Minimum Stock': 20,
-        'Barcode': '1234567890'
-      },
-      {
-        'Product Name': 'Sample Product 2',
-        'Size/Package': '1kg',
-        'Unit': 'kg',
-        'Category': 'electrical',
-        'Stock': 50,
-        'Purchase Price': 25.00,
-        'Sale Price': 35.50,
-        'Minimum Stock': 10,
-        'Barcode': '0987654321'
-      }
-    ];
-
-    const headers = Object.keys(sampleData[0]);
-    const csvRows = [
-      headers.join(','),
-      ...sampleData.map(row => headers.map(header => row[header]).join(','))
-    ];
-
-    const csvContent = csvRows.join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'sample_products_template.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
-    
-    toast.success('Sample template downloaded');
   };
 
   if (isLoading) {
@@ -654,7 +608,7 @@ const downloadCSVTemplate = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between space-y-4 md:space-y-0">
           <div className="flex-1 max-w-lg">
             <SearchBar
-              placeholder="Search products by name or barcode..."
+              placeholder="Search products by name, barcode, or supplier..."
               onSearch={setSearch}
               className="w-full"
             />
@@ -777,6 +731,9 @@ const downloadCSVTemplate = () => {
                     Category
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Supplier
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Stock
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -816,6 +773,22 @@ const downloadCSVTemplate = () => {
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                           {product.category || 'Uncategorized'}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {product.supplier ? (
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {product.supplier}
+                            </div>
+                            {product.supplierContact && (
+                              <div className="text-xs text-gray-500">
+                                {product.supplierContact}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-400">No supplier</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
@@ -944,6 +917,22 @@ const downloadCSVTemplate = () => {
                   {product.barcode && (
                     <div className="mb-3 text-xs text-gray-400">
                       <code>{product.barcode}</code>
+                    </div>
+                  )}
+                  
+                  {/* Supplier Info in Grid View */}
+                  {product.supplier && (
+                    <div className="mb-3">
+                      <div className="flex items-center text-sm text-gray-600 mb-1">
+                        <BuildingOfficeIcon className="h-4 w-4 mr-1" />
+                        <span className="font-medium truncate">{product.supplier}</span>
+                      </div>
+                      {product.supplierContact && (
+                        <div className="text-xs text-gray-500 flex items-center">
+                          <PhoneIcon className="h-3 w-3 mr-1" />
+                          <span className="truncate">{product.supplierContact}</span>
+                        </div>
+                      )}
                     </div>
                   )}
                   
@@ -1081,7 +1070,7 @@ const downloadCSVTemplate = () => {
           <div className="flex min-h-screen items-center justify-center p-4">
             <div className="fixed inset-0 bg-black bg-opacity-25" onClick={() => setShowDetails(false)} />
             
-            <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full">
+            <div className="relative bg-white rounded-lg shadow-xl max-w-4xl w-full">
               {/* Modal Header */}
               <div className="flex items-center justify-between p-6 border-b">
                 <div className="flex items-center space-x-3">
@@ -1105,12 +1094,12 @@ const downloadCSVTemplate = () => {
 
               {/* Modal Body */}
               <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                   {/* Basic Information */}
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     <div>
-                      <h4 className="text-sm font-medium text-gray-500 mb-2">Basic Information</h4>
-                      <div className="space-y-3">
+                      <h4 className="text-sm font-medium text-gray-500 mb-4">Basic Information</h4>
+                      <div className="space-y-4">
                         <div className="flex justify-between">
                           <span className="text-sm text-gray-600">Product Name:</span>
                           <span className="text-sm font-medium text-gray-900">{viewingProduct.productName}</span>
@@ -1129,13 +1118,19 @@ const downloadCSVTemplate = () => {
                             {viewingProduct.category}
                           </span>
                         </div>
+                        {viewingProduct.barcode && (
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-600">Barcode:</span>
+                            <code className="text-sm font-mono text-gray-900">{viewingProduct.barcode}</code>
+                          </div>
+                        )}
                       </div>
                     </div>
 
                     {/* Pricing Information */}
                     <div>
-                      <h4 className="text-sm font-medium text-gray-500 mb-2">Pricing</h4>
-                      <div className="space-y-3">
+                      <h4 className="text-sm font-medium text-gray-500 mb-4">Pricing</h4>
+                      <div className="space-y-4">
                         <div className="flex justify-between">
                           <span className="text-sm text-gray-600">Sale Price:</span>
                           <span className="text-lg font-bold text-gray-900">{formatCurrency(viewingProduct.salePrice)}</span>
@@ -1144,15 +1139,21 @@ const downloadCSVTemplate = () => {
                           <span className="text-sm text-gray-600">Purchase Price:</span>
                           <span className="text-sm font-medium text-gray-900">{formatCurrency(viewingProduct.purchasePrice)}</span>
                         </div>
+                        {viewingProduct.discount > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-600">Discount:</span>
+                            <span className="text-sm font-medium text-red-600">{viewingProduct.discount}%</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
 
                   {/* Stock Information */}
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     <div>
-                      <h4 className="text-sm font-medium text-gray-500 mb-2">Stock Information</h4>
-                      <div className="space-y-3">
+                      <h4 className="text-sm font-medium text-gray-500 mb-4">Stock Information</h4>
+                      <div className="space-y-4">
                         <div className="flex justify-between">
                           <span className="text-sm text-gray-600">Current Stock:</span>
                           <div className="flex items-center">
@@ -1177,19 +1178,6 @@ const downloadCSVTemplate = () => {
                             {formatCurrency(viewingProduct.quantity * viewingProduct.purchasePrice)}
                           </span>
                         </div>
-                      </div>
-                    </div>
-
-                    {/* Additional Information */}
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-500 mb-2">Additional Information</h4>
-                      <div className="space-y-3">
-                        {viewingProduct.barcode && (
-                          <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Barcode:</span>
-                            <code className="text-sm font-mono text-gray-900">{viewingProduct.barcode}</code>
-                          </div>
-                        )}
                         {viewingProduct.createdAt && (
                           <div className="flex justify-between">
                             <span className="text-sm text-gray-600">Created:</span>
@@ -1208,11 +1196,73 @@ const downloadCSVTemplate = () => {
                         )}
                       </div>
                     </div>
+
+                    {/* Supplier Information */}
+                    {viewingProduct.supplier && (
+                      <div className="mt-6">
+                        <h4 className="text-sm font-medium text-gray-500 mb-4 flex items-center">
+                          <BuildingOfficeIcon className="h-5 w-5 mr-2" />
+                          Supplier Information
+                        </h4>
+                        <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-600">Supplier:</span>
+                            <span className="text-sm font-medium text-gray-900">{viewingProduct.supplier}</span>
+                          </div>
+                          
+                          {viewingProduct.supplierSalesPerson && (
+                            <div className="flex justify-between">
+                              <span className="text-sm text-gray-600">Sales Person:</span>
+                              <span className="text-sm font-medium text-gray-900 flex items-center">
+                                <UserIcon className="h-4 w-4 mr-1" />
+                                {viewingProduct.supplierSalesPerson}
+                              </span>
+                            </div>
+                          )}
+                          
+                          {viewingProduct.supplierContact && (
+                            <div className="flex justify-between">
+                              <span className="text-sm text-gray-600">Contact:</span>
+                              <a 
+                                href={`tel:${viewingProduct.supplierContact}`}
+                                className="text-sm font-medium text-blue-600 hover:text-blue-800 flex items-center"
+                              >
+                                <PhoneIcon className="h-4 w-4 mr-1" />
+                                {viewingProduct.supplierContact}
+                              </a>
+                            </div>
+                          )}
+                          
+                          {viewingProduct.supplierEmail && (
+                            <div className="flex justify-between">
+                              <span className="text-sm text-gray-600">Email:</span>
+                              <a 
+                                href={`mailto:${viewingProduct.supplierEmail}`}
+                                className="text-sm font-medium text-blue-600 hover:text-blue-800 flex items-center"
+                              >
+                                <EnvelopeIcon className="h-4 w-4 mr-1" />
+                                {viewingProduct.supplierEmail}
+                              </a>
+                            </div>
+                          )}
+                          
+                          {viewingProduct.supplierAddress && (
+                            <div className="flex justify-between">
+                              <span className="text-sm text-gray-600">Address:</span>
+                              <span className="text-sm font-medium text-gray-900 text-right max-w-xs flex items-start">
+                                <MapPinIcon className="h-4 w-4 mr-1 mt-0.5 flex-shrink-0" />
+                                {viewingProduct.supplierAddress}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 {/* Stock Status Badge */}
-                <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                <div className="mt-8 p-4 bg-gray-50 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
                       {getStockStatus(viewingProduct.quantity, viewingProduct.minStockLevel).text === 'In Stock' ? (
@@ -1331,23 +1381,22 @@ const downloadCSVTemplate = () => {
                   </div>
 
                   {/* CSV Template */}
-                // In the CSV Template section of the import modal, update the text:
-<div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-  <h4 className="text-sm font-medium text-blue-800 mb-2">
-    CSV Template Format
-  </h4>
-  <p className="text-xs text-blue-700 mb-2">
-    Required columns: <strong>Product Name, Size/Package, Unit, Category, Stock, Purchase Price, Sale Price</strong><br />
-    Optional columns: <strong>Supplier, Minimum Stock, Barcode</strong>
-  </p>
-  <button
-    onClick={downloadCSVTemplate}
-    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-  >
-    <DocumentArrowDownIcon className="h-5 w-5 mr-2" />
-    Download CSV Template with Supplier
-  </button>
-</div>
+                  <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                    <h4 className="text-sm font-medium text-blue-800 mb-2">
+                      CSV Template Format
+                    </h4>
+                    <p className="text-xs text-blue-700 mb-2">
+                      Required columns: <strong>Product Name, Size/Package, Unit, Category, Stock, Purchase Price, Sale Price</strong><br />
+                      Optional columns: <strong>Supplier, Supplier Sales Person, Supplier Contact, Supplier Email, Supplier Address, Minimum Stock, Barcode</strong>
+                    </p>
+                    <button
+                      onClick={downloadCSVTemplate}
+                      className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                    >
+                      <DocumentArrowDownIcon className="h-5 w-5 mr-2" />
+                      Download CSV Template with Supplier
+                    </button>
+                  </div>
                 </div>
               </div>
 
