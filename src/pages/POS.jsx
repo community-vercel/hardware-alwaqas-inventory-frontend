@@ -27,7 +27,8 @@ import {
   ArrowsPointingOutIcon,
   ArrowsPointingInIcon,
   ClockIcon,
-  DocumentTextIcon
+  DocumentTextIcon,
+  CalculatorIcon
 } from '@heroicons/react/24/outline';
 import { productAPI, saleAPI } from '../services/api';
 import { formatCurrency } from '../utils/helpers';
@@ -45,9 +46,6 @@ const POS = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCustomerInfo, setShowCustomerInfo] = useState(false);
-  const [globalDiscount, setGlobalDiscount] = useState(0);
-  const [globalDiscountType, setGlobalDiscountType] = useState('percentage');
-  const [showGlobalDiscount, setShowGlobalDiscount] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [itemDiscountInput, setItemDiscountInput] = useState('');
   const [itemDiscountType, setItemDiscountType] = useState('percentage');
@@ -60,6 +58,13 @@ const POS = () => {
   const [showPurchaseHistory, setShowPurchaseHistory] = useState(false);
   const [loadingPurchaseHistory, setLoadingPurchaseHistory] = useState(false);
   const [manualGrandTotal, setManualGrandTotal] = useState(null);
+  const [showDiscountCalculator, setShowDiscountCalculator] = useState(false);
+  const [discountCalculation, setDiscountCalculation] = useState({
+    originalPrice: '',
+    discountAmount: '',
+    discountPercentage: '',
+    finalPrice: ''
+  });
   
   const searchInputRef = useRef(null);
   const rightPanelRef = useRef(null);
@@ -98,6 +103,7 @@ const POS = () => {
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             discount: item.discount,
+            discountType: item.discountType,
             total: item.quantity * item.unitPrice - (item.discount || 0)
           })) || []
         })) || [];
@@ -161,6 +167,34 @@ const POS = () => {
   useEffect(() => {
     setManualGrandTotal(null);
   }, [cart]);
+
+  // Calculate discount values when editing
+  useEffect(() => {
+    if (editingItem && itemDiscountInput) {
+      const item = cart.find(item => item.product === editingItem);
+      if (item) {
+        const itemTotal = item.quantity * item.unitPrice;
+        let discountAmount;
+        
+        if (itemDiscountType === 'percentage') {
+          const percentage = parseFloat(itemDiscountInput) || 0;
+          discountAmount = (percentage / 100) * itemTotal;
+        } else {
+          discountAmount = parseFloat(itemDiscountInput) || 0;
+        }
+        
+        // Update discount calculation state
+        setDiscountCalculation({
+          originalPrice: itemTotal.toFixed(2),
+          discountAmount: Math.round(discountAmount * 100) / 100,
+          discountPercentage: itemDiscountType === 'percentage' ? 
+            (parseFloat(itemDiscountInput) || 0).toFixed(2) : 
+            ((discountAmount / itemTotal) * 100 || 0).toFixed(2),
+          finalPrice: Math.round((itemTotal - discountAmount) * 100) / 100
+        });
+      }
+    }
+  }, [editingItem, itemDiscountInput, itemDiscountType, cart]);
 
   // Extract customers from data
   const customers = customersData?.data?.data?.docs || [];
@@ -327,32 +361,6 @@ const POS = () => {
     return Math.round(discountAmount * 100) / 100;
   };
 
-  // Apply global discount
-  const applyGlobalDiscount = () => {
-    if (globalDiscountType === 'percentage') {
-      if (globalDiscount < 0 || globalDiscount > 100) {
-        toast.error('Discount must be between 0 and 100%');
-        return;
-      }
-    } else {
-      if (globalDiscount < 0) {
-        toast.error('Discount cannot be negative');
-        return;
-      }
-    }
-    
-    toast.success(`Applied ${globalDiscount}${globalDiscountType === 'percentage' ? '%' : ''} discount`);
-    setShowGlobalDiscount(false);
-  };
-
-  // Remove global discount
-  const removeGlobalDiscount = () => {
-    setGlobalDiscount(0);
-    setGlobalDiscountType('percentage');
-    setManualGrandTotal(null);
-    toast.success('Removed global discount');
-  };
-
   // Apply discount to individual item
   const applyItemDiscount = (productId) => {
     const discount = parseFloat(itemDiscountInput);
@@ -385,6 +393,25 @@ const POS = () => {
     toast.success(`Applied discount to item`);
   };
 
+  // Remove discount from individual item
+  const removeItemDiscount = (productId) => {
+    setCart(prevCart =>
+      prevCart.map(item =>
+        item.product === productId
+          ? { 
+              ...item, 
+              discountType: 'percentage',
+              discountValue: 0 
+            }
+          : item
+      )
+    );
+    
+    setEditingItem(null);
+    setItemDiscountInput('');
+    toast.success(`Removed discount from item`);
+  };
+
   // Calculate totals with proper discount handling and rounding
   const calculateTotals = () => {
     let subtotal = 0;
@@ -397,40 +424,21 @@ const POS = () => {
       itemDiscounts += itemDiscount;
     });
     
-    const afterItemDiscounts = subtotal - itemDiscounts;
-    
-    let globalDiscountAmount = 0;
-    if (globalDiscount > 0) {
-      if (globalDiscountType === 'percentage') {
-        globalDiscountAmount = (globalDiscount / 100) * afterItemDiscounts;
-      } else {
-        globalDiscountAmount = Math.min(globalDiscount, afterItemDiscounts);
-      }
-    }
-    
-    const totalDiscount = itemDiscounts + globalDiscountAmount;
-    
     // Round to 2 decimal places to avoid floating point issues
     const roundedSubtotal = Math.round(subtotal * 100) / 100;
     const roundedItemDiscounts = Math.round(itemDiscounts * 100) / 100;
-    const roundedGlobalDiscountAmount = Math.round(globalDiscountAmount * 100) / 100;
-    const roundedTotalDiscount = Math.round(totalDiscount * 100) / 100;
-    const roundedGrandTotal = Math.max(0, Math.round((roundedSubtotal - roundedTotalDiscount) * 100) / 100);
+    const roundedGrandTotal = Math.max(0, Math.round((roundedSubtotal - roundedItemDiscounts) * 100) / 100);
     
     return { 
       subtotal: roundedSubtotal, 
       itemDiscounts: roundedItemDiscounts, 
-      globalDiscountAmount: roundedGlobalDiscountAmount, 
-      totalDiscount: roundedTotalDiscount, 
-      grandTotal: roundedGrandTotal
+      grandTotal: roundedGrandTotal 
     };
   };
 
   const { 
     subtotal, 
     itemDiscounts, 
-    globalDiscountAmount, 
-    totalDiscount, 
     grandTotal: calculatedGrandTotal 
   } = calculateTotals();
 
@@ -441,20 +449,6 @@ const POS = () => {
   const handleGrandTotalChange = (newTotal) => {
     const parsedTotal = Math.max(0, Math.round((parseFloat(newTotal) || 0) * 100) / 100);
     setManualGrandTotal(parsedTotal);
-    
-    // Recalculate global discount based on manual adjustment
-    const baseAmount = subtotal - itemDiscounts;
-    if (baseAmount > 0 && parsedTotal < baseAmount) {
-      const discountAmount = baseAmount - parsedTotal;
-      if (globalDiscountType === 'percentage') {
-        const percentage = (discountAmount / baseAmount) * 100;
-        setGlobalDiscount(Math.min(100, Math.round(percentage * 100) / 100));
-      } else {
-        setGlobalDiscount(Math.round(discountAmount * 100) / 100);
-      }
-    } else {
-      setGlobalDiscount(0);
-    }
   };
 
   const change = Math.max(0, Math.round((parseFloat(paidAmount || 0) - grandTotal) * 100) / 100);
@@ -500,10 +494,6 @@ const POS = () => {
         paidAmount: roundedPaid,
         subtotal: Math.round(subtotal * 100) / 100,
         itemDiscounts: Math.round(itemDiscounts * 100) / 100,
-        globalDiscount: Math.round(globalDiscount * 100) / 100,
-        globalDiscountType,
-        globalDiscountAmount: Math.round(globalDiscountAmount * 100) / 100,
-        totalDiscount: Math.round(totalDiscount * 100) / 100,
         grandTotal: roundedGrandTotal,
         change: roundedChange
       };
@@ -559,12 +549,10 @@ const POS = () => {
     setPaidAmount('');
     setSearchTerm('');
     setShowCustomerInfo(false);
-    setGlobalDiscount(0);
-    setGlobalDiscountType('percentage');
-    setShowGlobalDiscount(false);
     setEditingItem(null);
     setItemDiscountInput('');
     setManualGrandTotal(null);
+    setShowDiscountCalculator(false);
     if (searchInputRef.current) searchInputRef.current.focus();
   };
 
@@ -581,6 +569,7 @@ const POS = () => {
           .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 10px; }
           .items { margin: 15px 0; }
           .item { display: flex; justify-content: space-between; margin-bottom: 5px; }
+          .item-discount { font-size: 0.9em; color: #666; margin-left: 20px; }
           .totals { border-top: 2px solid #000; padding-top: 10px; margin-top: 10px; }
           .total-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
           .grand-total { font-weight: bold; font-size: 18px; }
@@ -594,22 +583,46 @@ const POS = () => {
           <p>${new Date(sale.saleDate).toLocaleString()}</p>
         </div>
         <div class="items">
-          ${sale.items.map(item => `
-            <div class="item">
-              <span>${item.productName} x${item.quantity}</span>
-              <span>${formatCurrency(item.quantity * item.unitPrice)}</span>
-            </div>
-          `).join('')}
+          ${sale.items.map(item => {
+            const itemTotal = item.quantity * item.unitPrice;
+            const discountAmount = item.discountType === 'percentage' ? 
+              (item.discount / 100) * itemTotal : 
+              item.discount;
+            const finalPrice = itemTotal - discountAmount;
+            
+            return `
+              <div class="item">
+                <div>
+                  <strong>${item.productName} x${item.quantity}</strong>
+                  ${item.discount > 0 ? `
+                    <div class="item-discount">
+                      ${item.discountType === 'percentage' ? 
+                        `-${item.discount}% discount` : 
+                        `-${formatCurrency(item.discount)} discount`}
+                    </div>
+                  ` : ''}
+                </div>
+                <div>
+                  ${formatCurrency(finalPrice)}
+                  ${discountAmount > 0 ? `
+                    <div style="text-decoration: line-through; color: #666; font-size: 0.9em;">
+                      ${formatCurrency(itemTotal)}
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+            `;
+          }).join('')}
         </div>
         <div class="totals">
           <div class="total-row">
             <span>Subtotal:</span>
             <span>${formatCurrency(sale.subtotal)}</span>
           </div>
-          ${sale.totalDiscount > 0 ? `
+          ${sale.itemDiscounts > 0 ? `
             <div class="total-row">
-              <span>Discount:</span>
-              <span>-${formatCurrency(sale.totalDiscount)}</span>
+              <span>Total Discount:</span>
+              <span>-${formatCurrency(sale.itemDiscounts)}</span>
             </div>
           ` : ''}
           <div class="total-row grand-total">
@@ -655,6 +668,85 @@ const POS = () => {
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [searchTerm, products]);
+
+  // Discount calculator handlers
+  const handleDiscountCalcChange = (field, value) => {
+    const numValue = parseFloat(value) || 0;
+    const newCalc = { ...discountCalculation };
+    
+    switch (field) {
+      case 'originalPrice':
+        newCalc.originalPrice = numValue;
+        if (newCalc.discountPercentage) {
+          const discountAmount = (numValue * parseFloat(newCalc.discountPercentage) / 100);
+          newCalc.discountAmount = Math.round(discountAmount * 100) / 100;
+          newCalc.finalPrice = Math.round((numValue - discountAmount) * 100) / 100;
+        } else if (newCalc.discountAmount) {
+          newCalc.discountPercentage = ((newCalc.discountAmount / numValue) * 100).toFixed(2);
+          newCalc.finalPrice = Math.round((numValue - newCalc.discountAmount) * 100) / 100;
+        } else if (newCalc.finalPrice) {
+          newCalc.discountAmount = Math.round((numValue - newCalc.finalPrice) * 100) / 100;
+          newCalc.discountPercentage = ((newCalc.discountAmount / numValue) * 100).toFixed(2);
+        }
+        break;
+        
+      case 'discountAmount':
+        newCalc.discountAmount = numValue;
+        if (newCalc.originalPrice) {
+          newCalc.discountPercentage = ((numValue / newCalc.originalPrice) * 100).toFixed(2);
+          newCalc.finalPrice = Math.round((newCalc.originalPrice - numValue) * 100) / 100;
+        }
+        break;
+        
+      case 'discountPercentage':
+        newCalc.discountPercentage = numValue;
+        if (newCalc.originalPrice) {
+          const discountAmount = (newCalc.originalPrice * numValue / 100);
+          newCalc.discountAmount = Math.round(discountAmount * 100) / 100;
+          newCalc.finalPrice = Math.round((newCalc.originalPrice - discountAmount) * 100) / 100;
+        }
+        break;
+        
+      case 'finalPrice':
+        newCalc.finalPrice = numValue;
+        if (newCalc.originalPrice) {
+          newCalc.discountAmount = Math.round((newCalc.originalPrice - numValue) * 100) / 100;
+          newCalc.discountPercentage = ((newCalc.discountAmount / newCalc.originalPrice) * 100).toFixed(2);
+        }
+        break;
+    }
+    
+    setDiscountCalculation(newCalc);
+  };
+
+  const applyDiscountFromCalculator = () => {
+    if (!editingItem) return;
+    
+    const item = cart.find(item => item.product === editingItem);
+    if (!item) return;
+    
+    const itemTotal = item.quantity * item.unitPrice;
+    
+    // Calculate discount value based on percentage
+    const discountPercentage = parseFloat(discountCalculation.discountPercentage) || 0;
+    if (discountPercentage > 100) {
+      toast.error('Discount cannot exceed 100%');
+      return;
+    }
+    
+    setItemDiscountInput(discountPercentage.toString());
+    setItemDiscountType('percentage');
+    
+    // Apply the discount
+    applyItemDiscount(editingItem);
+    setShowDiscountCalculator(false);
+    setDiscountCalculation({
+      originalPrice: '',
+      discountAmount: '',
+      discountPercentage: '',
+      finalPrice: ''
+    });
+  };
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
@@ -815,59 +907,6 @@ const POS = () => {
             </div>
           </div>
 
-          {/* Global Discount Panel */}
-          {showGlobalDiscount && (
-            <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-200">
-              <div className="flex justify-between items-center mb-3">
-                <h4 className="font-semibold text-sm text-amber-900 flex items-center gap-2">
-                  <SparklesIcon className="h-4 w-4" />
-                  Apply Global Discount
-                </h4>
-                <button 
-                  onClick={() => setShowGlobalDiscount(false)}
-                  className="p-1 hover:bg-amber-100 rounded-lg transition-colors"
-                >
-                  <XMarkIcon className="h-5 w-5 text-amber-600" />
-                </button>
-              </div>
-              <div className="flex items-center gap-2 mb-3">
-                <input
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  value={globalDiscount}
-                  onChange={(e) => setGlobalDiscount(parseFloat(e.target.value) || 0)}
-                  className="flex-1 px-3 py-2 border border-amber-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                  placeholder="Discount amount"
-                />
-                <select
-                  value={globalDiscountType}
-                  onChange={(e) => setGlobalDiscountType(e.target.value)}
-                  className="px-3 py-2 border border-amber-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
-                >
-                  <option value="percentage">Percentage (%)</option>
-                  <option value="fixed">Fixed Amount</option>
-                </select>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={applyGlobalDiscount}
-                  className="flex-1 px-3 py-2 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-lg text-sm font-medium transition-all duration-200 shadow-sm"
-                >
-                  Apply Discount
-                </button>
-                {globalDiscount > 0 && (
-                  <button
-                    onClick={removeGlobalDiscount}
-                    className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-300 rounded-lg text-sm font-medium transition-colors"
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
           {/* Main Scrollable Container for Both Cart Items and Payment Section */}
           <div className="flex-1 overflow-hidden flex flex-col">
             {/* Cart Items Section - Scrollable */}
@@ -932,17 +971,28 @@ const POS = () => {
                               )}
                             </div>
 
-                            <button
-                              onClick={() => {
-                                setEditingItem(item.product);
-                                setItemDiscountInput(item.discountValue.toString());
-                                setItemDiscountType(item.discountType);
-                              }}
-                              className="p-2 hover:bg-blue-100 rounded-lg text-blue-600 transition-colors flex-shrink-0"
-                              title="Edit discount"
-                            >
-                              <PencilIcon className="h-4 w-4" />
-                            </button>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => {
+                                  setEditingItem(item.product);
+                                  setItemDiscountInput(item.discountValue.toString());
+                                  setItemDiscountType(item.discountType);
+                                }}
+                                className="p-2 hover:bg-blue-100 rounded-lg text-blue-600 transition-colors flex-shrink-0"
+                                title="Edit discount"
+                              >
+                                <PencilIcon className="h-4 w-4" />
+                              </button>
+                              {item.discountValue > 0 && (
+                                <button
+                                  onClick={() => removeItemDiscount(item.product)}
+                                  className="p-2 hover:bg-red-100 rounded-lg text-red-600 transition-colors flex-shrink-0"
+                                  title="Remove discount"
+                                >
+                                  <XMarkIcon className="h-4 w-4" />
+                                </button>
+                              )}
+                            </div>
                           </div>
 
                           {item.discountValue > 0 && (
@@ -957,6 +1007,17 @@ const POS = () => {
 
                           {editingItem === item.product && (
                             <div className="mt-3 pt-3 border-t border-gray-200">
+                              <div className="flex items-center justify-between mb-3">
+                                <h5 className="text-sm font-medium text-gray-700">Apply Item Discount</h5>
+                                <button
+                                  onClick={() => setShowDiscountCalculator(true)}
+                                  className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded"
+                                >
+                                  <CalculatorIcon className="h-3 w-3" />
+                                  Calculator
+                                </button>
+                              </div>
+                              
                               <div className="flex items-center gap-2 mb-2">
                                 <input
                                   type="number"
@@ -976,6 +1037,35 @@ const POS = () => {
                                   <option value="fixed">Fixed</option>
                                 </select>
                               </div>
+                              
+                              {/* Discount Preview */}
+                              {itemDiscountInput && parseFloat(itemDiscountInput) > 0 && (
+                                <div className="mb-3 p-2 bg-blue-50 rounded border border-blue-200">
+                                  <div className="grid grid-cols-2 gap-2 text-xs">
+                                    <div className="text-gray-600">Original:</div>
+                                    <div className="text-right font-medium">{formatCurrency(itemTotal)}</div>
+                                    
+                                    <div className="text-gray-600">Discount:</div>
+                                    <div className="text-right font-medium text-green-700">
+                                      {itemDiscountType === 'percentage' 
+                                        ? `${itemDiscountInput}%` 
+                                        : formatCurrency(parseFloat(itemDiscountInput))
+                                      }
+                                    </div>
+                                    
+                                    <div className="text-gray-600">Discount Amount:</div>
+                                    <div className="text-right font-medium text-red-700">
+                                      -{formatCurrency(discountCalculation.discountAmount)}
+                                    </div>
+                                    
+                                    <div className="text-gray-600 font-bold">Final Price:</div>
+                                    <div className="text-right font-bold text-blue-700">
+                                      {formatCurrency(discountCalculation.finalPrice)}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                              
                               <div className="flex gap-2">
                                 <button
                                   onClick={() => applyItemDiscount(item.product)}
@@ -1186,27 +1276,6 @@ const POS = () => {
                   </div>
                 )}
 
-                {/* DISCOUNT BUTTON */}
-                {cart.length > 0 && (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setShowGlobalDiscount(true)}
-                      className="flex-1 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-lg text-sm font-medium transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-2"
-                    >
-                      <TagIcon className="h-4 w-4" />
-                      {globalDiscount > 0 ? 'Edit Global Discount' : 'Apply Global Discount'}
-                    </button>
-                    {globalDiscount > 0 && (
-                      <button
-                        onClick={removeGlobalDiscount}
-                        className="px-4 py-3 bg-red-50 hover:bg-red-100 text-red-700 border border-red-300 rounded-lg text-sm font-medium transition-colors"
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-                )}
-
                 {/* Totals Summary with Editable Grand Total */}
                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
                   <div className="space-y-2">
@@ -1217,30 +1286,8 @@ const POS = () => {
                     
                     {itemDiscounts > 0 && (
                       <div className="flex justify-between items-center text-sm text-green-700">
-                        <span>Item Discounts</span>
+                        <span>Total Item Discounts</span>
                         <span>-{formatCurrency(itemDiscounts)}</span>
-                      </div>
-                    )}
-                    
-                    {globalDiscount > 0 && (
-                      <div className="flex justify-between items-center text-sm text-amber-700">
-                        <span>Global Discount</span>
-                        <div className="flex items-center gap-2">
-                          <span>-{formatCurrency(globalDiscountAmount)}</span>
-                          <button
-                            onClick={() => setShowGlobalDiscount(true)}
-                            className="text-xs text-amber-600 hover:text-amber-800 hover:bg-amber-100 px-2 py-1 rounded"
-                          >
-                            Edit
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {totalDiscount > 0 && (
-                      <div className="flex justify-between items-center text-sm font-medium text-green-700 pt-2 border-t border-blue-300">
-                        <span>Total Discount</span>
-                        <span>-{formatCurrency(totalDiscount)}</span>
                       </div>
                     )}
                     
@@ -1364,6 +1411,149 @@ const POS = () => {
         </div>
       </div>
 
+      {/* Discount Calculator Modal */}
+      {showDiscountCalculator && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <CalculatorIcon className="h-5 w-5" />
+                  Discount Calculator
+                </h2>
+                <p className="text-sm text-gray-500">Calculate discount for selected item</p>
+              </div>
+              <button
+                onClick={() => setShowDiscountCalculator(false)}
+                className="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Original Price
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">PKR</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={discountCalculation.originalPrice}
+                      onChange={(e) => handleDiscountCalcChange('originalPrice', e.target.value)}
+                      className="w-full pl-12 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Discount Amount
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">PKR</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={discountCalculation.discountAmount}
+                        onChange={(e) => handleDiscountCalcChange('discountAmount', e.target.value)}
+                        className="w-full pl-12 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Discount Percentage
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={discountCalculation.discountPercentage}
+                        onChange={(e) => handleDiscountCalcChange('discountPercentage', e.target.value)}
+                        className="w-full pr-12 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-right"
+                        placeholder="0.0"
+                      />
+                      <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">%</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Final Price
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">PKR</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={discountCalculation.finalPrice}
+                      onChange={(e) => handleDiscountCalcChange('finalPrice', e.target.value)}
+                      className="w-full pl-12 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+
+                {/* Summary */}
+                {discountCalculation.originalPrice && discountCalculation.discountPercentage && (
+                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="text-sm font-medium text-blue-900 mb-2">Discount Summary</div>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="text-gray-600">Original Price:</div>
+                      <div className="text-right font-medium">{formatCurrency(discountCalculation.originalPrice)}</div>
+                      
+                      <div className="text-gray-600">Discount:</div>
+                      <div className="text-right font-medium text-green-700">
+                        {discountCalculation.discountPercentage}%
+                      </div>
+                      
+                      <div className="text-gray-600">You Save:</div>
+                      <div className="text-right font-medium text-red-700">
+                        -{formatCurrency(discountCalculation.discountAmount)}
+                      </div>
+                      
+                      <div className="text-gray-600 font-bold">Final Price:</div>
+                      <div className="text-right font-bold text-blue-700">
+                        {formatCurrency(discountCalculation.finalPrice)}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => setShowDiscountCalculator(false)}
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-100 rounded-lg text-sm font-medium transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={applyDiscountFromCalculator}
+                    className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+                  >
+                    Apply Discount
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Customer Purchase History Modal */}
       {showPurchaseHistory && selectedCustomer && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -1464,24 +1654,39 @@ const POS = () => {
                             <div className="border-t border-gray-200 pt-3">
                               <div className="text-xs font-medium text-gray-600 mb-2">Items Purchased:</div>
                               <div className="space-y-2">
-                                {sale.items.map((item, index) => (
-                                  <div key={item._id || index} className="flex justify-between text-sm">
-                                    <div className="text-gray-700">
-                                      <span className="font-medium">{item.productName || 'Product'}</span>
-                                      <span className="text-gray-500 ml-2">
-                                        (x{item.quantity || 1})
-                                      </span>
-                                      {item.discount > 0 && (
-                                        <span className="text-xs text-green-700 ml-2">
-                                          -{item.discount}%
+                                {sale.items.map((item, index) => {
+                                  const itemTotal = item.quantity * item.unitPrice;
+                                  const discountAmount = item.discountType === 'percentage' ? 
+                                    (item.discount / 100) * itemTotal : 
+                                    item.discount;
+                                  
+                                  return (
+                                    <div key={item._id || index} className="flex justify-between text-sm">
+                                      <div className="text-gray-700">
+                                        <span className="font-medium">{item.productName || 'Product'}</span>
+                                        <span className="text-gray-500 ml-2">
+                                          (x{item.quantity || 1})
                                         </span>
-                                      )}
+                                        {item.discount > 0 && (
+                                          <span className="text-xs text-green-700 ml-2">
+                                            {item.discountType === 'percentage' 
+                                              ? `-${item.discount}%` 
+                                              : `-${formatCurrency(item.discount)}`
+                                            }
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="text-gray-700 font-medium">
+                                        {formatCurrency(itemTotal - discountAmount)}
+                                        {discountAmount > 0 && (
+                                          <div className="text-xs text-gray-500 line-through">
+                                            {formatCurrency(itemTotal)}
+                                          </div>
+                                        )}
+                                      </div>
                                     </div>
-                                    <div className="text-gray-700 font-medium">
-                                      {formatCurrency((item.unitPrice || 0) * (item.quantity || 1))}
-                                    </div>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             </div>
                           )}
@@ -1489,7 +1694,7 @@ const POS = () => {
                           {/* Discount Information */}
                           {sale.totalDiscount > 0 && (
                             <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-200">
-                              <div className="text-sm text-gray-600">Discount Applied:</div>
+                              <div className="text-sm text-gray-600">Total Discount:</div>
                               <div className="text-sm font-medium text-green-700">
                                 -{formatCurrency(sale.totalDiscount || 0)}
                               </div>
