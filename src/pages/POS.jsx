@@ -1025,7 +1025,6 @@ const POS = () => {
                       {editingItem === item.product && (
                         <div className="mt-3 pt-3 border-t border-gray-200">
                           <div className="flex items-center justify-between mb-3">
-                            <h5 className="text-sm font-medium text-gray-700">Apply Item Discount</h5>
                             <button
                               onClick={() => setShowDiscountCalculator(true)}
                               className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded"
