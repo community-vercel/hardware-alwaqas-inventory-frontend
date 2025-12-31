@@ -13,21 +13,17 @@ import {
   QrCodeIcon,
   ArrowUturnLeftIcon,
   ChevronDownIcon,
-  ChevronUpIcon,
   TagIcon,
   PencilIcon,
   CheckIcon,
-  SparklesIcon,
   EyeIcon,
   MagnifyingGlassIcon,
-  UserGroupIcon,
   PhoneIcon,
   EnvelopeIcon,
   StarIcon,
   ArrowsPointingOutIcon,
   ArrowsPointingInIcon,
   ClockIcon,
-  DocumentTextIcon,
   CalculatorIcon
 } from '@heroicons/react/24/outline';
 import { productAPI, saleAPI } from '../services/api';
@@ -52,7 +48,6 @@ const POS = () => {
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [customerSearch, setCustomerSearch] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [showCustomerDetails, setShowCustomerDetails] = useState(false);
   const [isRightPanelExpanded, setIsRightPanelExpanded] = useState(false);
   const [customerPurchaseHistory, setCustomerPurchaseHistory] = useState([]);
   const [showPurchaseHistory, setShowPurchaseHistory] = useState(false);
@@ -69,7 +64,7 @@ const POS = () => {
   const searchInputRef = useRef(null);
   const rightPanelRef = useRef(null);
   const customerDropdownRef = useRef(null);
-  const cartItemsRef = useRef(null);
+  const discountInputRef = useRef(null);
 
   // Fetch customers
   const { data: customersData, isLoading: loadingCustomers } = useQuery({
@@ -150,6 +145,15 @@ const POS = () => {
       searchInputRef.current.focus();
     }
   }, []);
+
+  // Focus discount input when editing
+  useEffect(() => {
+    if (editingItem && discountInputRef.current) {
+      setTimeout(() => {
+        discountInputRef.current?.focus();
+      }, 100);
+    }
+  }, [editingItem]);
 
   // Close customer dropdown when clicking outside
   useEffect(() => {
@@ -361,7 +365,7 @@ const POS = () => {
     return Math.round(discountAmount * 100) / 100;
   };
 
-  // Apply discount to individual item
+  // Apply discount to individual item (auto-apply on Enter)
   const applyItemDiscount = (productId) => {
     const discount = parseFloat(itemDiscountInput);
     
@@ -410,6 +414,17 @@ const POS = () => {
     setEditingItem(null);
     setItemDiscountInput('');
     toast.success(`Removed discount from item`);
+  };
+
+  // Handle Enter key in discount input
+  const handleDiscountKeyPress = (e, productId) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      applyItemDiscount(productId);
+    } else if (e.key === 'Escape') {
+      setEditingItem(null);
+      setItemDiscountInput('');
+    }
   };
 
   // Calculate totals with proper discount handling and rounding
@@ -749,7 +764,7 @@ const POS = () => {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
       {/* Header */}
       <div className="bg-white shadow-lg p-4 border-b border-gray-200">
         <div className="flex justify-between items-center">
@@ -783,9 +798,9 @@ const POS = () => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden flex gap-4 p-4">
+      <div className="flex-1 flex gap-4 p-4 overflow-hidden">
         {/* Left Panel - Products */}
-        <div className={`${isRightPanelExpanded ? 'w-1/3' : 'flex-1'} flex flex-col rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden transition-all duration-300`}>
+        <div className={`${isRightPanelExpanded ? 'w-1/3' : 'flex-1'} flex flex-col rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden`}>
           <div className="p-4 border-b border-gray-200">
             <div className="relative">
               <input
@@ -866,7 +881,7 @@ const POS = () => {
         {/* Right Panel - Cart & Payment */}
         <div 
           ref={rightPanelRef}
-          className={`${isRightPanelExpanded ? 'w-2/3' : 'w-96'} bg-white shadow-lg flex flex-col rounded-xl border border-gray-200 overflow-hidden transition-all duration-300`}
+          className={`${isRightPanelExpanded ? 'w-2/3' : 'w-96'} bg-white shadow-lg flex flex-col rounded-xl border border-gray-200 overflow-hidden`}
         >
           {/* Cart Header with Expand/Collapse */}
           <div className="p-4 border-b border-gray-200 bg-white flex items-center justify-between">
@@ -907,505 +922,489 @@ const POS = () => {
             </div>
           </div>
 
-          {/* Main Scrollable Container for Both Cart Items and Payment Section */}
-          <div className="flex-1 overflow-hidden flex flex-col">
-            {/* Cart Items Section - Scrollable */}
-            <div 
-              ref={cartItemsRef}
-              className="flex-1 overflow-y-auto border-b border-gray-200"
-              style={{ minHeight: '200px', maxHeight: 'calc(60vh - 200px)' }}
-            >
-              <div className="p-4">
-                {cart.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-                    <ShoppingCartIcon className="h-24 w-24 mb-4 opacity-20" />
-                    <p className="text-base font-medium text-gray-600">Cart is empty</p>
-                    <p className="text-xs mt-2 text-gray-500">Add products to begin</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {cart.map((item) => {
-                      const itemTotal = item.quantity * item.unitPrice;
-                      const discountAmount = calculateItemDiscountAmount(item);
-                      const finalTotal = Math.round((itemTotal - discountAmount) * 100) / 100;
+          {/* Main Content - Scrollable Entire Panel */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="p-4">
+              {cart.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                  <ShoppingCartIcon className="h-24 w-24 mb-4 opacity-20" />
+                  <p className="text-base font-medium text-gray-600">Cart is empty</p>
+                  <p className="text-xs mt-2 text-gray-500">Add products to begin</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {cart.map((item) => {
+                    const itemTotal = item.quantity * item.unitPrice;
+                    const discountAmount = calculateItemDiscountAmount(item);
+                    const finalTotal = Math.round((itemTotal - discountAmount) * 100) / 100;
 
-                      return (
-                        <div key={item.product} className="bg-white rounded-lg p-4 shadow-sm border border-gray-200 hover:border-blue-300 transition-all group">
-                          <div className="flex justify-between items-start gap-3 mb-3">
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-semibold text-gray-900 text-sm truncate">{item.productName}</h4>
-                              <p className="text-xs text-gray-500 mt-0.5">{item.sizePackage}</p>
-                            </div>
-                            <button
-                              onClick={() => removeFromCart(item.product)}
-                              className="p-1.5 hover:bg-red-100 rounded-lg text-red-600 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
-                              title="Remove item"
+                    return (
+                      <div key={item.product} className="bg-white rounded-lg p-4 shadow-sm border border-gray-200 hover:border-blue-300 transition-all group">
+                        <div className="flex justify-between items-start gap-3 mb-3">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-gray-900 text-sm truncate">{item.productName}</h4>
+                            <p className="text-xs text-gray-500 mt-0.5">{item.sizePackage}</p>
+                          </div>
+                          <button
+                            onClick={() => removeFromCart(item.product)}
+                            className="p-1.5 hover:bg-red-100 rounded-lg text-red-600 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+                            title="Remove item"
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                          </button>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-3 mb-3">
+                          <div className="flex items-center bg-gray-50 rounded-lg border border-gray-300 overflow-hidden">
+                            <button 
+                              onClick={() => updateQuantity(item.product, item.quantity - 1)}
+                              className="p-2 hover:bg-gray-200 text-gray-700 transition-colors"
+                              title="Decrease quantity"
                             >
-                              <TrashIcon className="h-4 w-4" />
+                              <MinusIcon className="h-3.5 w-3.5" />
+                            </button>
+                            <span className="w-10 text-center text-gray-900 font-semibold text-base">{item.quantity}</span>
+                            <button 
+                              onClick={() => updateQuantity(item.product, item.quantity + 1)}
+                              className="p-2 hover:bg-gray-200 text-gray-700 transition-colors"
+                              title="Increase quantity"
+                            >
+                              <PlusIcon className="h-3.5 w-3.5" />
                             </button>
                           </div>
 
-                          <div className="flex items-center justify-between gap-3 mb-3">
-                            <div className="flex items-center bg-gray-50 rounded-lg border border-gray-300 overflow-hidden">
-                              <button 
-                                onClick={() => updateQuantity(item.product, item.quantity - 1)}
-                                className="p-2 hover:bg-gray-200 text-gray-700 transition-colors"
-                                title="Decrease quantity"
-                              >
-                                <MinusIcon className="h-3.5 w-3.5" />
-                              </button>
-                              <span className="w-10 text-center text-gray-900 font-semibold text-base">{item.quantity}</span>
-                              <button 
-                                onClick={() => updateQuantity(item.product, item.quantity + 1)}
-                                className="p-2 hover:bg-gray-200 text-gray-700 transition-colors"
-                                title="Increase quantity"
-                              >
-                                <PlusIcon className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-
-                            <div className="text-right">
-                              <div className="font-bold text-blue-600 text-base">{formatCurrency(finalTotal)}</div>
-                              {discountAmount > 0 && (
-                                <div className="text-xs text-gray-500 line-through">{formatCurrency(itemTotal)}</div>
-                              )}
-                            </div>
-
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => {
-                                  setEditingItem(item.product);
-                                  setItemDiscountInput(item.discountValue.toString());
-                                  setItemDiscountType(item.discountType);
-                                }}
-                                className="p-2 hover:bg-blue-100 rounded-lg text-blue-600 transition-colors flex-shrink-0"
-                                title="Edit discount"
-                              >
-                                <PencilIcon className="h-4 w-4" />
-                              </button>
-                              {item.discountValue > 0 && (
-                                <button
-                                  onClick={() => removeItemDiscount(item.product)}
-                                  className="p-2 hover:bg-red-100 rounded-lg text-red-600 transition-colors flex-shrink-0"
-                                  title="Remove discount"
-                                >
-                                  <XMarkIcon className="h-4 w-4" />
-                                </button>
-                              )}
-                            </div>
+                          <div className="text-right">
+                            <div className="font-bold text-blue-600 text-base">{formatCurrency(finalTotal)}</div>
+                            {discountAmount > 0 && (
+                              <div className="text-xs text-gray-500 line-through">{formatCurrency(itemTotal)}</div>
+                            )}
                           </div>
 
-                          {item.discountValue > 0 && (
-                            <div className="text-xs text-green-700 bg-green-100 rounded px-3 py-1.5 inline-flex items-center gap-1">
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                setEditingItem(item.product);
+                                setItemDiscountInput(item.discountValue.toString());
+                                setItemDiscountType(item.discountType);
+                              }}
+                              className="p-2 hover:bg-blue-100 rounded-lg text-blue-600 transition-colors flex-shrink-0"
+                              title="Edit discount"
+                            >
+                              <PencilIcon className="h-4 w-4" />
+                            </button>
+                            {item.discountValue > 0 && (
+                              <button
+                                onClick={() => removeItemDiscount(item.product)}
+                                className="p-2 hover:bg-red-100 rounded-lg text-red-600 transition-colors flex-shrink-0"
+                                title="Remove discount"
+                              >
+                                <XMarkIcon className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {item.discountValue > 0 && (
+                          <div className="flex items-center justify-between">
+                            <div className="text-xs text-green-700 bg-green-100 rounded px-3 py-1.5 inline-flex items-center gap-1 flex-1">
                               <TagIcon className="h-3 w-3" />
                               {item.discountType === 'percentage' 
                                 ? `-${item.discountValue}% discount applied`
                                 : `-${formatCurrency(item.discountValue)} discount applied`
                               }
                             </div>
-                          )}
+                            <button
+                              onClick={() => removeItemDiscount(item.product)}
+                              className="ml-2 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        )}
 
-                          {editingItem === item.product && (
-                            <div className="mt-3 pt-3 border-t border-gray-200">
-                              <div className="flex items-center justify-between mb-3">
-                                <h5 className="text-sm font-medium text-gray-700">Apply Item Discount</h5>
-                                <button
-                                  onClick={() => setShowDiscountCalculator(true)}
-                                  className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded"
-                                >
-                                  <CalculatorIcon className="h-3 w-3" />
-                                  Calculator
-                                </button>
+                        {editingItem === item.product && (
+                          <div className="mt-3 pt-3 border-t border-gray-200">
+                            <div className="flex items-center justify-between mb-3">
+                              <h5 className="text-sm font-medium text-gray-700">Apply Item Discount</h5>
+                              <button
+                                onClick={() => setShowDiscountCalculator(true)}
+                                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded"
+                              >
+                                <CalculatorIcon className="h-3 w-3" />
+                                Calculator
+                              </button>
+                            </div>
+                            
+                            <div className="flex items-center gap-2 mb-2">
+                              <input
+                                ref={discountInputRef}
+                                type="number"
+                                value={itemDiscountInput}
+                                onChange={(e) => setItemDiscountInput(e.target.value)}
+                                onKeyDown={(e) => handleDiscountKeyPress(e, item.product)}
+                                className="flex-1 px-3 py-2 border border-blue-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="Discount amount"
+                                min="0"
+                                step="0.5"
+                              />
+                              <select
+                                value={itemDiscountType}
+                                onChange={(e) => setItemDiscountType(e.target.value)}
+                                className="px-3 py-2 border border-blue-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              >
+                                <option value="percentage">%</option>
+                                <option value="fixed">Fixed</option>
+                              </select>
+                            </div>
+                            
+                            {/* Discount Preview */}
+                            {itemDiscountInput && parseFloat(itemDiscountInput) > 0 && (
+                              <div className="mb-2 p-2 bg-blue-50 rounded border border-blue-200">
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                  <div className="text-gray-600">Original:</div>
+                                  <div className="text-right font-medium">{formatCurrency(itemTotal)}</div>
+                                  
+                                  <div className="text-gray-600">Discount:</div>
+                                  <div className="text-right font-medium text-green-700">
+                                    {itemDiscountType === 'percentage' 
+                                      ? `${itemDiscountInput}%` 
+                                      : formatCurrency(parseFloat(itemDiscountInput))
+                                    }
+                                  </div>
+                                  
+                                  <div className="text-gray-600">Discount Amount:</div>
+                                  <div className="text-right font-medium text-red-700">
+                                    -{formatCurrency(discountCalculation.discountAmount)}
+                                  </div>
+                                  
+                                  <div className="text-gray-600 font-bold">Final Price:</div>
+                                  <div className="text-right font-bold text-blue-700">
+                                    {formatCurrency(discountCalculation.finalPrice)}
+                                  </div>
+                                </div>
                               </div>
-                              
-                              <div className="flex items-center gap-2 mb-2">
-                                <input
-                                  type="number"
-                                  value={itemDiscountInput}
-                                  onChange={(e) => setItemDiscountInput(e.target.value)}
-                                  className="flex-1 px-3 py-2 border border-blue-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                  placeholder="Discount amount"
-                                  min="0"
-                                  step="0.5"
-                                />
-                                <select
-                                  value={itemDiscountType}
-                                  onChange={(e) => setItemDiscountType(e.target.value)}
-                                  className="px-3 py-2 border border-blue-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                >
-                                  <option value="percentage">%</option>
-                                  <option value="fixed">Fixed</option>
-                                </select>
-                              </div>
-                              
-                              {/* Discount Preview */}
-                              {itemDiscountInput && parseFloat(itemDiscountInput) > 0 && (
-                                <div className="mb-3 p-2 bg-blue-50 rounded border border-blue-200">
-                                  <div className="grid grid-cols-2 gap-2 text-xs">
-                                    <div className="text-gray-600">Original:</div>
-                                    <div className="text-right font-medium">{formatCurrency(itemTotal)}</div>
-                                    
-                                    <div className="text-gray-600">Discount:</div>
-                                    <div className="text-right font-medium text-green-700">
-                                      {itemDiscountType === 'percentage' 
-                                        ? `${itemDiscountInput}%` 
-                                        : formatCurrency(parseFloat(itemDiscountInput))
-                                      }
+                            )}
+                            
+                            <div className="text-xs text-gray-500 mb-3">
+                              Press <span className="font-mono bg-gray-100 px-1 py-0.5 rounded">Enter</span> to apply, <span className="font-mono bg-gray-100 px-1 py-0.5 rounded">Esc</span> to cancel
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Customer Selection */}
+              <div className="relative mt-6" ref={customerDropdownRef}>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-semibold text-gray-700">Customer</label>
+                  {selectedCustomer && (
+                    <button
+                      onClick={handleClearCustomer}
+                      className="text-xs text-red-600 hover:text-red-800 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                
+                <button
+                  onClick={() => setShowCustomerDropdown(!showCustomerDropdown)}
+                  className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-gray-700 border border-gray-300"
+                >
+                  <div className="flex items-center gap-2 text-sm truncate">
+                    <UserIcon className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                    {selectedCustomer ? (
+                      <span className="truncate">
+                        {selectedCustomer.name || selectedCustomer.phone || 'Customer'} 
+                        {selectedCustomer.phone && selectedCustomer.name && ` (${selectedCustomer.phone})`}
+                      </span>
+                    ) : customer.name || customer.phone || customer.address ? (
+                      <span className="truncate">
+                        {customer.name || customer.phone || 'New Customer'}
+                        {customer.phone && customer.name && ` (${customer.phone})`}
+                      </span>
+                    ) : (
+                      <span>Select or add customer</span>
+                    )}
+                  </div>
+                  <ChevronDownIcon className="h-4 w-4 flex-shrink-0" />
+                </button>
+
+                {showCustomerDropdown && (
+                  <div className="absolute z-50 mt-1 w-full bg-white rounded-lg shadow-xl border border-gray-200 max-h-96 overflow-hidden flex flex-col">
+                    {/* Search Bar */}
+                    <div className="p-2 border-b border-gray-200">
+                      <div className="relative">
+                        <MagnifyingGlassIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Search customers..."
+                          value={customerSearch}
+                          onChange={(e) => setCustomerSearch(e.target.value)}
+                          className="w-full pl-8 pr-8 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                          autoFocus
+                        />
+                        {customerSearch && (
+                          <button
+                            onClick={() => setCustomerSearch('')}
+                            className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                          >
+                            <XMarkIcon className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Customer List */}
+                    <div className="flex-1 overflow-y-auto">
+                      {loadingCustomers ? (
+                        <div className="p-4 text-center">
+                          <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-200 border-t-blue-600 mx-auto"></div>
+                        </div>
+                      ) : filteredCustomers.length > 0 ? (
+                        <div className="divide-y divide-gray-100">
+                          {filteredCustomers.map((customerItem) => {
+                            const customerType = customerItem.totalSpent > 5000 ? 'VIP' : 
+                                                customerItem.totalSpent > 1000 ? 'Regular' : 'New';
+                            
+                            return (
+                              <div 
+                                key={customerItem._id || customerItem.phone}
+                                className="p-2 hover:bg-gray-50 cursor-pointer transition-colors"
+                                onClick={() => handleSelectCustomer(customerItem)}
+                              >
+                                <div className="flex justify-between items-start">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-1 mb-0.5">
+                                      <span className="text-sm font-medium text-gray-900 truncate">
+                                        {customerItem.name || 'Unknown Customer'}
+                                      </span>
+                                      {customerType === 'VIP' && (
+                                        <StarIcon className="h-3 w-3 text-yellow-500 flex-shrink-0" />
+                                      )}
                                     </div>
-                                    
-                                    <div className="text-gray-600">Discount Amount:</div>
-                                    <div className="text-right font-medium text-red-700">
-                                      -{formatCurrency(discountCalculation.discountAmount)}
+                                    <div className="text-xs text-gray-500 truncate">
+                                      {customerItem.phone || 'No phone'}
                                     </div>
-                                    
-                                    <div className="text-gray-600 font-bold">Final Price:</div>
-                                    <div className="text-right font-bold text-blue-700">
-                                      {formatCurrency(discountCalculation.finalPrice)}
+                                    <div className="flex items-center gap-2 mt-1">
+                                      <span className="text-xs text-gray-600">
+                                        {customerItem.totalPurchases || 0} purchases
+                                      </span>
+                                      <span className="text-xs text-gray-600">
+                                        {formatCurrency(customerItem.totalSpent || 0)} spent
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1 ml-2">
+                                    <button
+                                      onClick={(e) => handleViewPurchaseHistory(customerItem, e)}
+                                      className="p-1.5 hover:bg-blue-100 rounded text-blue-600 transition-colors"
+                                      title="View purchase history"
+                                    >
+                                      <ClockIcon className="h-4 w-4" />
+                                    </button>
+                                    <div className="text-xs font-medium px-1.5 py-0.5 rounded bg-gray-100 text-gray-800">
+                                      {customerType}
                                     </div>
                                   </div>
                                 </div>
-                              )}
-                              
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={() => applyItemDiscount(item.product)}
-                                  className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
-                                >
-                                  Apply Discount
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setEditingItem(null);
-                                    setItemDiscountInput('');
-                                  }}
-                                  className="flex-1 px-3 py-2 border border-gray-300 text-gray-700 hover:bg-gray-100 rounded-lg text-sm transition-colors"
-                                >
-                                  Cancel
-                                </button>
                               </div>
-                            </div>
-                          )}
+                            );
+                          })}
                         </div>
-                      );
-                    })}
+                      ) : (
+                        <div className="p-4 text-center text-gray-500 text-sm">
+                          {customerSearch ? 'No customers found' : 'No customers available'}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Add New Customer Button */}
+                    <div className="p-2 border-t border-gray-200">
+                      <button
+                        onClick={handleAddNewCustomer}
+                        className="w-full py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center justify-center gap-2"
+                      >
+                        <PlusIcon className="h-4 w-4" />
+                        Add New Customer (All fields optional)
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
-            </div>
 
-            {/* Payment Section - Scrollable */}
-            <div className="overflow-y-auto" style={{ maxHeight: 'calc(40vh - 100px)' }}>
-              <div className="p-4 space-y-4">
-                {/* Customer Selection */}
-                <div className="relative" ref={customerDropdownRef}>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-xs font-semibold text-gray-700">Customer</label>
-                    {selectedCustomer && (
+              {/* Customer Details Form (for new customer) */}
+              {(!selectedCustomer || showCustomerInfo) && (
+                <div className="space-y-2 mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs font-medium text-gray-600">New Customer Details (All Optional)</span>
+                    {customer.name || customer.phone || customer.address ? (
                       <button
                         onClick={handleClearCustomer}
                         className="text-xs text-red-600 hover:text-red-800 hover:bg-red-50 px-2 py-1 rounded transition-colors"
                       >
                         Clear
                       </button>
-                    )}
+                    ) : null}
                   </div>
                   
-                  <button
-                    onClick={() => setShowCustomerDropdown(!showCustomerDropdown)}
-                    className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors text-gray-700 border border-gray-300"
-                  >
-                    <div className="flex items-center gap-2 text-sm truncate">
-                      <UserIcon className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                      {selectedCustomer ? (
-                        <span className="truncate">
-                          {selectedCustomer.name || selectedCustomer.phone || 'Customer'} 
-                          {selectedCustomer.phone && selectedCustomer.name && ` (${selectedCustomer.phone})`}
-                        </span>
-                      ) : customer.name || customer.phone || customer.address ? (
-                        <span className="truncate">
-                          {customer.name || customer.phone || 'New Customer'}
-                          {customer.phone && customer.name && ` (${customer.phone})`}
-                        </span>
-                      ) : (
-                        <span>Select or add customer</span>
-                      )}
-                    </div>
-                    <ChevronDownIcon className="h-4 w-4 flex-shrink-0" />
-                  </button>
-
-                  {showCustomerDropdown && (
-                    <div className="absolute z-50 mt-1 w-full bg-white rounded-lg shadow-xl border border-gray-200 max-h-96 overflow-hidden flex flex-col">
-                      {/* Search Bar */}
-                      <div className="p-2 border-b border-gray-200">
-                        <div className="relative">
-                          <MagnifyingGlassIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                          <input
-                            type="text"
-                            placeholder="Search customers..."
-                            value={customerSearch}
-                            onChange={(e) => setCustomerSearch(e.target.value)}
-                            className="w-full pl-8 pr-8 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                            autoFocus
-                          />
-                          {customerSearch && (
-                            <button
-                              onClick={() => setCustomerSearch('')}
-                              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                            >
-                              <XMarkIcon className="h-4 w-4" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Customer List */}
-                      <div className="flex-1 overflow-y-auto">
-                        {loadingCustomers ? (
-                          <div className="p-4 text-center">
-                            <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-200 border-t-blue-600 mx-auto"></div>
-                          </div>
-                        ) : filteredCustomers.length > 0 ? (
-                          <div className="divide-y divide-gray-100">
-                            {filteredCustomers.map((customerItem) => {
-                              const customerType = customerItem.totalSpent > 5000 ? 'VIP' : 
-                                                  customerItem.totalSpent > 1000 ? 'Regular' : 'New';
-                              
-                              return (
-                                <div 
-                                  key={customerItem._id || customerItem.phone}
-                                  className="p-2 hover:bg-gray-50 cursor-pointer transition-colors"
-                                  onClick={() => handleSelectCustomer(customerItem)}
-                                >
-                                  <div className="flex justify-between items-start">
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-1 mb-0.5">
-                                        <span className="text-sm font-medium text-gray-900 truncate">
-                                          {customerItem.name || 'Unknown Customer'}
-                                        </span>
-                                        {customerType === 'VIP' && (
-                                          <StarIcon className="h-3 w-3 text-yellow-500 flex-shrink-0" />
-                                        )}
-                                      </div>
-                                      <div className="text-xs text-gray-500 truncate">
-                                        {customerItem.phone || 'No phone'}
-                                      </div>
-                                      <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-xs text-gray-600">
-                                          {customerItem.totalPurchases || 0} purchases
-                                        </span>
-                                        <span className="text-xs text-gray-600">
-                                          {formatCurrency(customerItem.totalSpent || 0)} spent
-                                        </span>
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center gap-1 ml-2">
-                                      <button
-                                        onClick={(e) => handleViewPurchaseHistory(customerItem, e)}
-                                        className="p-1.5 hover:bg-blue-100 rounded text-blue-600 transition-colors"
-                                        title="View purchase history"
-                                      >
-                                        <ClockIcon className="h-4 w-4" />
-                                      </button>
-                                      <div className="text-xs font-medium px-1.5 py-0.5 rounded bg-gray-100 text-gray-800">
-                                        {customerType}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <div className="p-4 text-center text-gray-500 text-sm">
-                            {customerSearch ? 'No customers found' : 'No customers available'}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Add New Customer Button */}
-                      <div className="p-2 border-t border-gray-200">
-                        <button
-                          onClick={handleAddNewCustomer}
-                          className="w-full py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center justify-center gap-2"
-                        >
-                          <PlusIcon className="h-4 w-4" />
-                          Add New Customer (All fields optional)
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  <input
+                    type="text"
+                    placeholder="Name (optional)"
+                    value={customer.name}
+                    onChange={(e) => setCustomer({ ...customer, name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-blue-500"
+                  />
+                  <input
+                    type="tel"
+                    placeholder="Phone (optional)"
+                    value={customer.phone}
+                    onChange={(e) => setCustomer({ ...customer, phone: e.target.value.replace(/\D/g, '') })}
+                    maxLength="11"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-blue-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Address (optional)"
+                    value={customer.address}
+                    onChange={(e) => setCustomer({ ...customer, address: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-blue-500"
+                  />
                 </div>
+              )}
 
-                {/* Customer Details Form (for new customer) */}
-                {(!selectedCustomer || showCustomerInfo) && (
-                  <div className="space-y-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-xs font-medium text-gray-600">New Customer Details (All Optional)</span>
-                      {customer.name || customer.phone || customer.address ? (
-                        <button
-                          onClick={handleClearCustomer}
-                          className="text-xs text-red-600 hover:text-red-800 hover:bg-red-50 px-2 py-1 rounded transition-colors"
-                        >
-                          Clear
-                        </button>
-                      ) : null}
-                    </div>
-                    
-                    <input
-                      type="text"
-                      placeholder="Name (optional)"
-                      value={customer.name}
-                      onChange={(e) => setCustomer({ ...customer, name: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-blue-500"
-                    />
-                    <input
-                      type="tel"
-                      placeholder="Phone (optional)"
-                      value={customer.phone}
-                      onChange={(e) => setCustomer({ ...customer, phone: e.target.value.replace(/\D/g, '') })}
-                      maxLength="11"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-blue-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Address (optional)"
-                      value={customer.address}
-                      onChange={(e) => setCustomer({ ...customer, address: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-                )}
-
-                {/* Totals Summary with Editable Grand Total */}
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Subtotal</span>
-                      <span className="font-semibold text-gray-900">{formatCurrency(subtotal)}</span>
-                    </div>
-                    
-                    {itemDiscounts > 0 && (
-                      <div className="flex justify-between items-center text-sm text-green-700">
-                        <span>Total Item Discounts</span>
-                        <span>-{formatCurrency(itemDiscounts)}</span>
-                      </div>
-                    )}
-                    
-                    {/* Editable Grand Total */}
-                    <div className="flex justify-between items-center pt-2 border-t border-blue-300">
-                      <span className="text-lg font-bold text-blue-700">Grand Total</span>
-                      <div className="relative">
-                        <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">PKR </span>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={grandTotal}
-                          onChange={(e) => handleGrandTotalChange(e.target.value)}
-                          onBlur={(e) => {
-                            if (e.target.value === '' || parseFloat(e.target.value) === calculatedGrandTotal) {
-                              setManualGrandTotal(null);
-                            }
-                          }}
-                          className="pl-10 pr-2 py-1 text-lg font-bold text-blue-700 bg-transparent border border-transparent hover:border-blue-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-200 w-32 text-right"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Payment Method */}
-                <div>
-                  <label className="text-xs font-semibold text-gray-700 block mb-2">Payment Method</label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {[
-                      { key: 'cash', icon: BanknotesIcon, label: 'Cash', color: 'green' },
-                      { key: 'card', icon: CreditCardIcon, label: 'Card', color: 'blue' },
-                      { key: 'credit', icon: ReceiptPercentIcon, label: 'Credit', color: 'purple' },
-                      { key: 'mixed', icon: 'M', label: 'Mixed', color: 'gray' }
-                    ].map((m) => (
-                      <button
-                        key={m.key}
-                        onClick={() => setPaymentMethod(m.key)}
-                        className={`p-2 rounded-lg text-xs font-medium flex flex-col items-center transition-all ${
-                          paymentMethod === m.key 
-                            ? `bg-${m.color}-600 text-white shadow-md` 
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                      >
-                        {typeof m.icon === 'string' ? (
-                          <span className="text-base mb-1">{m.icon}</span>
-                        ) : (
-                          <m.icon className="h-5 w-5 mb-1" />
-                        )}
-                        {m.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Paid Amount */}
-                <div>
-                  <label className="text-xs font-semibold text-gray-700 block mb-2">Paid Amount</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-lg">PKR </span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={paidAmount}
-                      onChange={(e) => setPaidAmount(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full pl-10 pr-4 py-3 text-xl border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all font-semibold text-gray-900"
-                    />
+              {/* Totals Summary with Editable Grand Total */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200 mt-6">
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Subtotal</span>
+                    <span className="font-semibold text-gray-900">{formatCurrency(subtotal)}</span>
                   </div>
                   
-                  <div className="flex gap-2 mt-3">
-                    <button 
-                      onClick={() => setPaidAmount(grandTotal.toFixed())}
-                      className="flex-1 py-2 border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-medium transition-colors"
-                    >
-                      Exact Amount
-                    </button>
-                    {[500, 1000, 5000].map(v => (
-                      <button 
-                        key={v}
-                        onClick={() => setPaidAmount((parseFloat(paidAmount || 1) + v).toString())}
-                        className="flex-1 py-2 border border-gray-300 text-gray-700 hover:bg-gray-100 rounded-lg text-xs font-medium transition-colors"
-                      >
-                        +{v}
-                      </button>
-                    ))}
+                  {itemDiscounts > 0 && (
+                    <div className="flex justify-between items-center text-sm text-green-700">
+                      <span>Total Item Discounts</span>
+                      <span>-{formatCurrency(itemDiscounts)}</span>
+                    </div>
+                  )}
+                  
+                  {/* Editable Grand Total */}
+                  <div className="flex justify-between items-center pt-2 border-t border-blue-300">
+                    <span className="text-lg font-bold text-blue-700">Grand Total</span>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">PKR </span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={grandTotal}
+                        onChange={(e) => handleGrandTotalChange(e.target.value)}
+                        onBlur={(e) => {
+                          if (e.target.value === '' || parseFloat(e.target.value) === calculatedGrandTotal) {
+                            setManualGrandTotal(null);
+                          }
+                        }}
+                        className="pl-10 pr-2 py-1 text-lg font-bold text-blue-700 bg-transparent border border-transparent hover:border-blue-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-200 w-32 text-right"
+                      />
+                    </div>
                   </div>
                 </div>
-
-                {/* Change Display */}
-                {paidAmount && Math.round(parseFloat(paidAmount)) >= grandTotal && (
-                  <div className="p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg text-center border border-green-200">
-                    <div className="text-xs text-green-700 mb-1">Change Due</div>
-                    <div className="text-2xl font-bold text-green-700">{formatCurrency(change)}</div>
-                  </div>
-                )}
-
-                {/* Complete Sale Button */}
-                <button
-                  onClick={handleCheckout}
-                  disabled={isProcessing || cart.length === 0 || Math.round((parseFloat(paidAmount || 0) * 100) / 100) < Math.round(grandTotal * 100) / 100}
-                  className="w-full py-4 rounded-lg text-white font-bold text-base shadow-lg disabled:bg-gray-400 disabled:cursor-not-allowed disabled:shadow-none bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-3"
-                >
-                  {isProcessing ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
-                      Processing Sale...
-                    </>
-                  ) : (
-                    <>
-                      <CheckIcon className="h-5 w-5" />
-                      Complete Sale • {formatCurrency(grandTotal)}
-                    </>
-                  )}
-                </button>
               </div>
+
+              {/* Payment Method */}
+              <div className="mt-6">
+                <label className="text-xs font-semibold text-gray-700 block mb-2">Payment Method</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { key: 'cash', icon: BanknotesIcon, label: 'Cash', color: 'green' },
+                    { key: 'card', icon: CreditCardIcon, label: 'Card', color: 'blue' },
+                    { key: 'credit', icon: ReceiptPercentIcon, label: 'Credit', color: 'purple' },
+                    { key: 'mixed', icon: 'M', label: 'Mixed', color: 'gray' }
+                  ].map((m) => (
+                    <button
+                      key={m.key}
+                      onClick={() => setPaymentMethod(m.key)}
+                      className={`p-2 rounded-lg text-xs font-medium flex flex-col items-center transition-all ${
+                        paymentMethod === m.key 
+                          ? `bg-${m.color}-600 text-white shadow-md` 
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {typeof m.icon === 'string' ? (
+                        <span className="text-base mb-1">{m.icon}</span>
+                      ) : (
+                        <m.icon className="h-5 w-5 mb-1" />
+                      )}
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Paid Amount */}
+              <div className="mt-6">
+                <label className="text-xs font-semibold text-gray-700 block mb-2">Paid Amount</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-lg">PKR </span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={paidAmount}
+                    onChange={(e) => setPaidAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full pl-10 pr-4 py-3 text-xl border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all font-semibold text-gray-900"
+                  />
+                </div>
+                
+                <div className="flex gap-2 mt-3">
+                  <button 
+                    onClick={() => setPaidAmount(grandTotal.toFixed())}
+                    className="flex-1 py-2 border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-medium transition-colors"
+                  >
+                    Exact Amount
+                  </button>
+                  {[500, 1000, 5000].map(v => (
+                    <button 
+                      key={v}
+                      onClick={() => setPaidAmount((parseFloat(paidAmount || 1) + v).toString())}
+                      className="flex-1 py-2 border border-gray-300 text-gray-700 hover:bg-gray-100 rounded-lg text-xs font-medium transition-colors"
+                    >
+                      +{v}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Change Display */}
+              {paidAmount && Math.round(parseFloat(paidAmount)) >= grandTotal && (
+                <div className="p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg text-center border border-green-200 mt-4">
+                  <div className="text-xs text-green-700 mb-1">Change Due</div>
+                  <div className="text-2xl font-bold text-green-700">{formatCurrency(change)}</div>
+                </div>
+              )}
+
+              {/* Complete Sale Button */}
+              <button
+                onClick={handleCheckout}
+                disabled={isProcessing || cart.length === 0 || Math.round((parseFloat(paidAmount || 0) * 100) / 100) < Math.round(grandTotal * 100) / 100}
+                className="w-full py-4 rounded-lg text-white font-bold text-base shadow-lg disabled:bg-gray-400 disabled:cursor-not-allowed disabled:shadow-none bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-3 mt-6"
+              >
+                {isProcessing ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                    Processing Sale...
+                  </>
+                ) : (
+                  <>
+                    <CheckIcon className="h-5 w-5" />
+                    Complete Sale • {formatCurrency(grandTotal)}
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
