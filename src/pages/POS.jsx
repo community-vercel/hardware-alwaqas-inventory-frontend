@@ -780,13 +780,13 @@ const POS = () => {
             </div>
           </div>
           <div className="flex items-center space-x-3">
-            <button
+            {/* <button
               onClick={() => setShowScanner(true)}
               className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all duration-200 shadow-md"
             >
               <QrCodeIcon className="h-5 w-5 mr-2" />
               Scan
-            </button>
+            </button> */}
             <button
               onClick={resetPOS}
               className="inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-all duration-200 shadow-md"
