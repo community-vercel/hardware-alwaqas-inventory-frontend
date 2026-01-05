@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
+import logo from './../../public/logo.svg';
 import { 
   HomeIcon, 
   ShoppingCartIcon, 
@@ -257,8 +258,8 @@ const Layout = () => {
           {/* Desktop sidebar header */}
           <div className="flex items-center h-16 px-6 border-b border-gray-200">
             <div className="flex items-center">
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 flex items-center justify-center">
-                <CubeIcon className="h-5 w-5 text-white" />
+              <div className=" rounded-sm  flex items-center justify-center">
+<img src={logo} alt="Logo" className="h-15 w-15" />
               </div>
               <div className="ml-3">
                 <h1 className="text-lg font-bold text-gray-900">Al-Waqas Paint</h1>
