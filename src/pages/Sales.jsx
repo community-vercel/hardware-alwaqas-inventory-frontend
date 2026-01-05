@@ -282,13 +282,13 @@ const Sales = () => {
                       >
                         <PrinterIcon className="h-5 w-5" />
                       </button>
-                      <button
+                      {/* <button
                        onClick={() => toast('View details coming soon')}
                         className="text-primary-600 hover:text-primary-900"
                         title="View Details"
                       >
                         <EyeIcon className="h-5 w-5" />
-                      </button>
+                      </button> */}
                     </div>
                   </td>
                 </tr>
